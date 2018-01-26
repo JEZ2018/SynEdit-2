@@ -224,7 +224,7 @@ const
       'step', 'strict', 'then', 'to', 'try', 'type', 'unit', 'until', 'uses', 
       'var', 'virtual', 'while', 'xor'
   );
-  cKeyWords_PropertyScoped: array [0..4] of string = (
+  cKeyWordsPropertyScoped: array [0..4] of string = (
       'default', 'index', 'read', 'stored', 'write'
   );
   cKeywordsTypeScoped: array [0..1] of string = (
