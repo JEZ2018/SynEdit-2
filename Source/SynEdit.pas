@@ -2448,6 +2448,7 @@ var
   x: Integer;
   FoldRange: TSynFoldRange;
   Index : Integer;
+  PlusMinusMargin : integer;
 //-- CodeFolding
 begin
   vFirstLine := RowToLine(aFirstRow);
@@ -2555,6 +2556,7 @@ begin
 //++ CodeFolding
   // Draw the folding lines and squares
   if UseCodeFolding then begin
+    PlusMinusMargin := MulDiv(2, Screen.PixelsPerInch, 96);
     for cRow := aFirstRow to aLastRow do begin
       vLine := RowToLine(cRow);
       if (vLine > Lines.Count) and not (Lines.Count = 0) then
@@ -2572,14 +2574,14 @@ begin
 
         // Paint minus sign
         Canvas.Pen.Color := fCodeFolding.FolderBarLinesColor;
-        Canvas.MoveTo(rcFold.Left + 2, rcFold.Top + ((rcFold.Bottom - rcFold.Top) div 2));
-        Canvas.LineTo(rcFold.Right - 2, rcFold.Top + ((rcFold.Bottom - rcFold.Top) div 2));
+        Canvas.MoveTo(rcFold.Left + PlusMinusMargin, rcFold.Top + ((rcFold.Bottom - rcFold.Top) div 2));
+        Canvas.LineTo(rcFold.Right - PlusMinusMargin, rcFold.Top + ((rcFold.Bottom - rcFold.Top) div 2));
 
         // Paint vertical line of plus sign
         if FoldRange.Collapsed then begin
           x := rcFold.Left + ((rcFold.Right - rcFold.Left) div 2);
-          Canvas.MoveTo(x, rcFold.Top + 2);
-          Canvas.LineTo(x, rcFold.Bottom - 2);
+          Canvas.MoveTo(x, rcFold.Top + PlusMinusMargin);
+          Canvas.LineTo(x, rcFold.Bottom - PlusMinusMargin);
         end
         else
         // Draw the bottom part of a line
@@ -4648,7 +4650,7 @@ begin
   //  to the right of RightOffset and 2 * Gutter.RightMagin to the left of
   //  fGuttterWidth.  It is centered vertically.
   //  Gutter.RightMargin is 2 at 96 DPI
-    Gutter.RightOffset := CodeFolding.GutterShapeSize + 3 * Gutter.RightMargin
+    Gutter.RightOffset := CodeFolding.GutterShapeSize + 2 * Gutter.RightMargin
   else
     Gutter.RightOffset := Gutter.RightMargin;
   Invalidate;
@@ -4767,7 +4769,7 @@ begin
         ScrollInfo.fMask := ScrollInfo.fMask or SIF_DISABLENOSCROLL;
       end;
 
-      if Visible then SendMessage(Handle, WM_SETREDRAW, 0, 0);
+//      if Visible then SendMessage(Handle, WM_SETREDRAW, 0, 0);
 
       if (fScrollBars in [TScrollStyle.ssBoth, TScrollStyle.ssHorizontal]) and not WordWrap then
       begin
@@ -4855,9 +4857,10 @@ begin
         else
           EnableScrollBar(Handle, SB_VERT, ESB_ENABLE_BOTH);
 
-        if Visible then SendMessage(Handle, WM_SETREDRAW, -1, 0);
-        if fPaintLock=0 then
-           Invalidate;
+//        if Visible then SendMessage(Handle, WM_SETREDRAW, -1, 0);
+//        if fPaintLock=0 then
+//           Invalidate;
+        Update;
 
       end
       else
@@ -6405,8 +6408,8 @@ end;
 procedure TCustomSynEdit.ChangeScale(M, D: Integer{$if CompilerVersion >= 31}; isDpiChange: Boolean{$endif});
 begin
   {$if CompilerVersion >= 31}if isDpiChange then begin{$endif}
-    CodeFolding.GutterShapeSize := MulDiv(CodeFolding.GutterShapeSize, M, D);
     if Assigned(fGutter) then fGutter.ChangeScale(M,D);
+    CodeFolding.GutterShapeSize := MulDiv(CodeFolding.GutterShapeSize, M, D);
     if Assigned(fBookMarkOpt) then fBookMarkOpt.ChangeScale(M, D);
     if Assigned(fWordWrapGlyph) then fWordWrapGlyph.ChangeScale(M, D);
   {$if CompilerVersion >= 31}end;{$endif}
@@ -8703,7 +8706,6 @@ begin
     end
     else
       UpdateScrollbars;
-    Exclude(fStateFlags, sfScrollbarChanged);
     if not (eoScrollPastEol in Options) then
       LeftChar := LeftChar;
     if not (eoScrollPastEof in Options) then

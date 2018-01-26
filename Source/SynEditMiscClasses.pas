@@ -331,6 +331,8 @@ type
   public
     constructor Create(AOwner: TComponent); override;
   published
+    property Font;
+    property Color;
     property BorderStyle: TSynBorderStyle read FBorderStyle write SetBorderStyle
       default bsSingle;
     property HotKey: TShortCut read FHotKey write SetHotKey default $0041; { Alt+A }
@@ -435,7 +437,7 @@ begin
  fLeftOffset := MulDiv(fLeftOffset, M, D);
  fRightOffset := MulDiv(fRightOffset, M, D);
  fRightMargin := MulDiv(fRightMargin, M, D);
- fFont.Height := MulDiv(fFont.Height, M, D);
+ fFont.Height := Round(fFont.Height * M / D);
  if Assigned(fOnChange) then fOnChange(Self);
 end;
 //-- DPI-Aware
@@ -491,7 +493,10 @@ begin
     fZeroStart := Src.fZeroStart;
     fLeftOffset := Src.fLeftOffset;
     fDigitCount := Src.fDigitCount;
-    fRightOffset := Src.fRightOffset;
+//++  Code Folding
+    // Do not change RightOffset since it varies with Code Folding
+    //fRightOffset := Src.fRightOffset;
+//--  Code Folding
     fRightMargin := Src.fRightMargin;
     fAutoSize := Src.fAutoSize;
     fAutoSizeDigitCount := Src.fAutoSizeDigitCount;
@@ -1390,6 +1395,7 @@ begin
   Canvas.Brush.Color := Color;
   InflateRect(r, -BorderWidth, -BorderWidth);
   Canvas.FillRect(r);
+  Canvas.Font := Font;
   TextRect(Canvas, r, BorderWidth + 1, BorderWidth + 1, Text);
 end;
 
