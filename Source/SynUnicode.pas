@@ -191,9 +191,6 @@ procedure SetClipboardText(const Text: string);
 function IsWideCharMappableToAnsi(const WC: WideChar): Boolean;
 function IsUnicodeStringMappableToAnsi(const WS: string): Boolean;
 
-var
-  Win32PlatformIsUnicode: Boolean;
-
 implementation
 
 uses
@@ -295,107 +292,23 @@ end;
 // from Troy Wolbrinks, TntUnicode-package.
 
 function WCharUpper(lpsz: PWideChar): PWideChar;
-var
-  AStr: AnsiString;
-  WStr: string;
 begin
-  if Win32PlatformIsUnicode then
-    Result := Windows.CharUpperW(lpsz)
-  else
-  begin
-    if HiWord(Cardinal(lpsz)) = 0 then
-    begin
-      // literal char mode
-      Result := lpsz;
-      if IsWideCharMappableToAnsi(WideChar(lpsz)) then
-      begin
-        AStr := AnsiString(WideChar(lpsz)); // single character may be more than one byte
-        Windows.CharUpperA(PAnsiChar(AStr));
-        WStr := string(AStr); // should always be single wide char
-        if Length(WStr) = 1 then
-          Result := PWideChar(WStr[1]);
-      end
-    end
-    else
-    begin
-      // null-terminated string mode
-      Result := lpsz;
-      while lpsz^ <> #0 do
-      begin
-        lpsz^ := WideChar(SynUnicode.WCharUpper(PWideChar(lpsz^)));
-        Inc(lpsz);
-      end;
-    end;
-  end;
+  Result := Windows.CharUpperW(lpsz)
 end;
 
 function WCharUpperBuff(lpsz: PWideChar; cchLength: DWORD): DWORD;
-var
-  i: integer;
 begin
-  if Win32PlatformIsUnicode then
-    Result := Windows.CharUpperBuffW(lpsz, cchLength)
-  else
-  begin
-    Result := cchLength;
-    for i := 1 to cchLength do
-    begin
-      lpsz^ := WideChar(SynUnicode.WCharUpper(PWideChar(lpsz^)));
-      Inc(lpsz);
-    end;
-  end;
+  Result := Windows.CharUpperBuffW(lpsz, cchLength)
 end;
 
 function WCharLower(lpsz: PWideChar): PWideChar;
-var
-  AStr: AnsiString;
-  WStr: string;
 begin
-  if Win32PlatformIsUnicode then
-    Result := Windows.CharLowerW(lpsz)
-  else
-  begin
-    if HiWord(Cardinal(lpsz)) = 0 then
-    begin
-      // literal char mode
-      Result := lpsz;
-      if IsWideCharMappableToAnsi(WideChar(lpsz)) then
-      begin
-        AStr := AnsiString(WideChar(lpsz)); // single character may be more than one byte
-        Windows.CharLowerA(PAnsiChar(AStr));
-        WStr := string(AStr); // should always be single wide char
-        if Length(WStr) = 1 then
-          Result := PWideChar(WStr[1]);
-      end
-    end
-    else
-    begin
-      // null-terminated string mode
-      Result := lpsz;
-      while lpsz^ <> #0 do
-      begin
-        lpsz^ := WideChar(SynUnicode.WCharLower(PWideChar(lpsz^)));
-        Inc(lpsz);
-      end;
-    end;
-  end;
+  Result := Windows.CharLowerW(lpsz)
 end;
 
 function WCharLowerBuff(lpsz: PWideChar; cchLength: DWORD): DWORD;
-var
-  i: integer;
 begin
-  if Win32PlatformIsUnicode then
-    Result := Windows.CharLowerBuffW(lpsz, cchLength)
-  else
-  begin
-    Result := cchLength;
-    for i := 1 to cchLength do
-    begin
-      lpsz^ := WideChar(SynUnicode.WCharLower(PWideChar(lpsz^)));
-      Inc(lpsz);
-    end;
-  end;
+  Result := Windows.CharLowerBuffW(lpsz, cchLength)
 end;
 
 function SynWideUpperCase(const S: string): string;
@@ -420,20 +333,12 @@ end;
 
 function SynIsCharAlpha(const C: WideChar): Boolean;
 begin
-  if Win32PlatformIsUnicode then
-    Result := IsCharAlphaW(C)
-  else
-    // returns false if C is not mappable to ANSI
-    Result := IsCharAlphaA(AnsiChar(C));
+  Result := IsCharAlphaW(C)
 end;
 
 function SynIsCharAlphaNumeric(const C: WideChar): Boolean;
 begin
-  if Win32PlatformIsUnicode then
-    Result := IsCharAlphaNumericW(C)
-  else
-    // returns false if C is not mappable to ANSI
-    Result := IsCharAlphaNumericA(AnsiChar(C));
+  Result := IsCharAlphaNumericW(C)
 end;
 
 function WideLastDelimiter(const Delimiters, S: string): Integer;
@@ -778,13 +683,12 @@ function GetTextSize(DC: HDC; Str: PWideChar; Count: Integer): TSize;
 const
   SSAnalyseFlags = SSA_GLYPHS or SSA_FALLBACK or SSA_LINK;
 {$ENDIF}
+{$IFDEF SYN_UNISCRIBE}
 var
-  tm: TTextMetricA;
-  {$IFDEF SYN_UNISCRIBE}
   GlyphBufferSize: Integer;
   saa: TScriptStringAnalysis;
   lpSize: PSize;
-  {$ENDIF}
+{$ENDIF}
 begin
   Result.cx := 0;
   Result.cy := 0;
@@ -798,7 +702,7 @@ begin
     // value for GlyphBufferSize (see documentation of cGlyphs parameter of
     // ScriptStringAnalyse function)
     GlyphBufferSize := (3 * Count) div 2 + 16;
-    
+
     if Succeeded(ScriptStringAnalyse(DC, Str, Count, GlyphBufferSize, -1,
       SSAnalyseFlags, 0, nil, nil, nil, nil, nil, @saa)) then
     begin
@@ -819,14 +723,6 @@ begin
 {$ENDIF}
   begin
     GetTextExtentPoint32W(DC, Str, Count, Result);
-    if not Win32PlatformIsUnicode then
-    begin
-      GetTextMetricsA(DC, tm);
-      if tm.tmPitchAndFamily and TMPF_TRUETYPE <> 0 then
-        Result.cx := Result.cx - tm.tmOverhang
-      else
-        Result.cx := tm.tmAveCharWidth * Count;
-    end;
   end;
 end;
 
@@ -1449,6 +1345,6 @@ begin
 end;
 
 initialization
-  Win32PlatformIsUnicode := (Win32Platform = VER_PLATFORM_WIN32_NT);
+  Assert(Win32Platform = VER_PLATFORM_WIN32_NT, 'Unsupported Windows version');
 
 end.

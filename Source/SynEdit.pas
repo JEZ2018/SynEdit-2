@@ -3013,33 +3013,17 @@ var
     LastChar := Ord(TokenAccu.s[TokenAccu.Len]);
     NormalCharWidth := fTextDrawer.TextWidth(WideChar(LastChar));
     RealCharWidth := NormalCharWidth;
-    if Win32PlatformIsUnicode then
+
+    if GetCharABCWidthsW(Canvas.Handle, LastChar, LastChar, CharInfo) then
     begin
-      if GetCharABCWidthsW(Canvas.Handle, LastChar, LastChar, CharInfo) then
-      begin
-        RealCharWidth := CharInfo.abcA + Integer(CharInfo.abcB);
-        if CharInfo.abcC >= 0 then
-          Inc(RealCharWidth, CharInfo.abcC);
-      end
-      else if LastChar < Ord(High(AnsiChar)) then
-      begin
-        GetTextMetricsA(Canvas.Handle, tm);
-        RealCharWidth := tm.tmAveCharWidth + tm.tmOverhang;
-      end;
+      RealCharWidth := CharInfo.abcA + Integer(CharInfo.abcB);
+      if CharInfo.abcC >= 0 then
+        Inc(RealCharWidth, CharInfo.abcC);
     end
-    else if WideChar(LastChar) <= High(AnsiChar) then
+    else if LastChar < Ord(High(AnsiChar)) then
     begin
-      if GetCharABCWidths(Canvas.Handle, LastChar, LastChar, CharInfo) then
-      begin
-        RealCharWidth := CharInfo.abcA + Integer(CharInfo.abcB);
-        if CharInfo.abcC >= 0 then
-          Inc(RealCharWidth, CharInfo.abcC);
-      end
-      else if LastChar < Ord(High(AnsiChar)) then
-      begin
-        GetTextMetricsA(Canvas.Handle, tm);
-        RealCharWidth := tm.tmAveCharWidth + tm.tmOverhang;
-      end;
+      GetTextMetricsA(Canvas.Handle, tm);
+      RealCharWidth := tm.tmAveCharWidth + tm.tmOverhang;
     end;
 
     if RealCharWidth > NormalCharWidth then
@@ -4929,7 +4913,6 @@ end;
 procedure TCustomSynEdit.WMDropFiles(var Msg: TMessage);
 var
   i, iNumberDropped: Integer;
-  FileNameA: array[0..MAX_PATH - 1] of AnsiChar;
   FileNameW: array[0..MAX_PATH - 1] of WideChar;
   Point: TPoint;
   FilesList: TStringList;
@@ -4943,20 +4926,12 @@ begin
           nil, 0);
         DragQueryPoint(THandle(Msg.wParam), Point);
 
-        if Win32PlatformIsUnicode then
-          for i := 0 to iNumberDropped - 1 do
-          begin
-            DragQueryFileW(THandle(Msg.wParam), i, FileNameW,
-              sizeof(FileNameW) div 2);
-            FilesList.Add(FileNameW)
-          end
-        else
-          for i := 0 to iNumberDropped - 1 do
-          begin
-            DragQueryFileA(THandle(Msg.wParam), i, FileNameA,
-              sizeof(FileNameA));
-            FilesList.Add(string(FileNameA))
-          end;
+        for i := 0 to iNumberDropped - 1 do
+        begin
+          DragQueryFileW(THandle(Msg.wParam), i, FileNameW,
+            sizeof(FileNameW) div 2);
+          FilesList.Add(FileNameW)
+        end;
         fOnDropFiles(Self, Point.X, Point.Y, FilesList);
       finally
         FilesList.Free;

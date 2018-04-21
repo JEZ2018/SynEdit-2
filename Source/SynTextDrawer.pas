@@ -931,33 +931,16 @@ procedure TheTextDrawer.ExtTextOut(X, Y: Integer; Options: TTextOutOptions;
     LastChar := Ord(Text[Length - 1]);
     CharWidth := FETODist[Length - 1];
     RealCharWidth := CharWidth;
-    if Win32PlatformIsUnicode then
+    if GetCachedABCWidth(LastChar, CharInfo) then
     begin
-      if GetCachedABCWidth(LastChar, CharInfo) then
-      begin
-        RealCharWidth := CharInfo.abcA + Integer(CharInfo.abcB);
-        if CharInfo.abcC >= 0 then
-          Inc(RealCharWidth, CharInfo.abcC);
-      end
-      else if LastChar < Ord(High(AnsiChar)) then
-      begin
-        GetTextMetricsA(FDC, tm);
-        RealCharWidth := tm.tmAveCharWidth + tm.tmOverhang;
-      end;
+      RealCharWidth := CharInfo.abcA + Integer(CharInfo.abcB);
+      if CharInfo.abcC >= 0 then
+        Inc(RealCharWidth, CharInfo.abcC);
     end
-    else if WideChar(LastChar) <= High(AnsiChar) then
+    else if LastChar < Ord(High(AnsiChar)) then
     begin
-      if GetCharABCWidthsA(FDC, LastChar, LastChar, CharInfo) then
-      begin
-        RealCharWidth := CharInfo.abcA + Integer(CharInfo.abcB);
-        if CharInfo.abcC >= 0 then
-          Inc(RealCharWidth, CharInfo.abcC);
-      end
-      else if LastChar < Ord(High(AnsiChar)) then
-      begin
-        GetTextMetricsA(FDC, tm);
-        RealCharWidth := tm.tmAveCharWidth + tm.tmOverhang;
-      end;
+      GetTextMetricsA(FDC, tm);
+      RealCharWidth := tm.tmAveCharWidth + tm.tmOverhang;
     end;
     if RealCharWidth > CharWidth then
       Inc(ARect.Right, RealCharWidth - CharWidth);

@@ -1943,10 +1943,7 @@ end;
 
 procedure TSynBaseCompletionProposalForm.WMChar(var Msg: TWMChar);
 begin
-  if Win32PlatformIsUnicode then
-    DoKeyPressW(WideChar(Msg.CharCode))
-  else
-    DoKeyPressW(KeyUnicode(AnsiChar(Msg.CharCode)));
+  DoKeyPressW(WideChar(Msg.CharCode))
 end;
 
 procedure TSynBaseCompletionProposalForm.DoFormHide(Sender: TObject);
