@@ -4167,13 +4167,13 @@ begin
     end
     else
       InvalidateLines(-1, -1);
-    if (Options >= [eoAutoSizeMaxScrollWidth, eoScrollPastEol]) and
-      (MaxScrollWidth < LeftChar + CharsInWindow) then
-    begin
-      MaxScrollWidth := LeftChar + CharsInWindow
-    end
-    else
-      UpdateScrollBars;
+//    if (Options >= [eoAutoSizeMaxScrollWidth, eoScrollPastEol]) and
+//      (MaxScrollWidth < LeftChar + CharsInWindow) then
+//    begin
+//      MaxScrollWidth := LeftChar + CharsInWindow
+//    end
+//    else
+    UpdateScrollBars;
     StatusChanged([scLeftChar]);
   end;
 end;
