@@ -1246,10 +1246,7 @@ begin
     Style := WS_POPUP;
     ExStyle := WS_EX_TOOLWINDOW;
 
-    if ((Win32Platform and VER_PLATFORM_WIN32_NT) <> 0)
-      and (Win32MajorVersion > 4)
-      and (Win32MinorVersion > 0) {Windows XP} then
-      Params.WindowClass.style := Params.WindowClass.style or CS_DROPSHADOW;
+   Params.WindowClass.style := Params.WindowClass.style or CS_DROPSHADOW;
 
     if DisplayType = ctCode then
       if FResizeable then
@@ -1266,8 +1263,7 @@ begin
   if not (csDesigning in ComponentState) then
   begin
     // "redefine" window-procedure to get Unicode messages
-    if Win32Platform = VER_PLATFORM_WIN32_NT then
-      SetWindowLongW(Handle, GWL_WNDPROC, Integer(GetWindowLongA(Handle, GWL_WNDPROC)));
+    SetWindowLongW(Handle, GWL_WNDPROC, Integer(GetWindowLongA(Handle, GWL_WNDPROC)));
   end;
 end;
 
@@ -3474,7 +3470,7 @@ begin
   i := 0;
   while (i < AutoCompleteList.Count) do begin
     if (length(AutoCompleteList[i]) > 0) and (AutoCompleteList[i][1] <> '=') then
-      List.Add(WideTrim(AutoCompleteList[i]));
+      List.Add(Trim(AutoCompleteList[i]));
     inc(i);
   end;
   Result := List.Text;

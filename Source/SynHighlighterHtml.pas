@@ -943,7 +943,7 @@ begin
       end
       else
         for i := Low(EscapeAmps) To High(EscapeAmps) do
-          if (WStrLComp((fLine + Run), EscapeAmps[i], WStrLen(EscapeAmps[i])) = 0) then
+          if (AnsiStrLComp((fLine + Run), EscapeAmps[i], Length(EscapeAmps[i])) = 0) then
           begin
             fAndCode := i;
             fRange := rsAmpersand;
@@ -987,7 +987,7 @@ begin
   Low(EscapeAmps)..High(EscapeAmps):
     begin
       fTokenID := tkAmpersand;
-      Inc(Run, WStrLen(EscapeAmps[fAndCode]));
+      Inc(Run, Length(EscapeAmps[fAndCode]));
     end;
     else begin
       if (fLine[Run + 1] = '#') then

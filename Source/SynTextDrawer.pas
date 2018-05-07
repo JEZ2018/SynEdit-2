@@ -960,7 +960,7 @@ end;
 
 function TheTextDrawer.TextExtent(const Text: string): TSize;
 begin
-  Result := SynUnicode.TextExtent(FStockBitmap.Canvas, Text);
+  Result := FStockBitmap.Canvas.TextExtent(Text);
 end;
 
 function TheTextDrawer.TextExtent(Text: PWideChar; Count: Integer): TSize;
@@ -977,13 +977,13 @@ begin
       if c<=High(FCharWidthCache) then begin
          Result:=FCharWidthCache[c];
          if Result=0 then begin
-            Result:=SynUnicode.TextExtent(FStockBitmap.Canvas, Text).cX;
+            Result:=FStockBitmap.Canvas.TextExtent(Text).cX;
             FCharWidthCache[c]:=Result;
          end;
          Exit;
       end;
    end;
-   Result := SynUnicode.TextExtent(FStockBitmap.Canvas, Text).cX;
+   Result := FStockBitmap.Canvas.TextExtent(Text).cX;
 end;
 
 function TheTextDrawer.TextWidth(Text: PWideChar; Count: Integer): Integer;

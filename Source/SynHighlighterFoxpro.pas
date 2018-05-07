@@ -1606,7 +1606,7 @@ end;
 
 procedure TSynFoxproSyn.StarProc;
 begin
-  if (Run = 0) or (WideTrim(Copy(fLine, 1, Run)) = '') then
+  if (Run = 0) or (Trim(Copy(fLine, 1, Run)) = '') then
   begin                        {Foxpro Comments}
     inc(Run);
     fTokenID := tkComment;

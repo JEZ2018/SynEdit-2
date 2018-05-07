@@ -4971,7 +4971,7 @@ begin
   if HandleAllocated and IsWindowUnicode(Handle) then
   begin
     WStrLCopy(PWideChar(Msg.Text), PWideChar(Text), Msg.TextMax - 1);
-    Msg.Result := WStrLen(PWideChar(Msg.Text));
+    Msg.Result := Length(PWideChar(Msg.Text));
   end
   else
   begin
@@ -7819,7 +7819,7 @@ begin
       ecImeStr:
         if not ReadOnly then
         begin
-          SetString(S, PWideChar(Data), WStrLen(Data));
+          S := PWideChar(Data);
           if SelAvail then
           begin
             BeginUndoBlock;
@@ -9131,7 +9131,7 @@ begin
         Spaces := Copy(fLines[CaretXY.Line - 1], 1, CaretXY.Char - 1);
         while Pos(#9, Spaces) > 0 do
           Delete(Spaces, Pos(#9, Spaces), 1);
-        Spaces := WideTrim(Spaces);
+        Spaces := Trim(Spaces);
 
         //smart tabs are only in the front of the line *NOT IN THE MIDDLE*
         if Spaces = '' then
@@ -9485,14 +9485,14 @@ begin
     begin
       InsertStrLen := (FTabWidth + 2) * (e - BB.Line) + FTabWidth + 1;
       //               chars per line * lines-1    + last line + null char
-      StrToInsert := WStrAlloc(InsertStrLen);
+      StrToInsert := WideStrAlloc(InsertStrLen);
       Run := StrToInsert;
       Spaces := UnicodeStringOfChar(#32, FTabWidth);
     end
     else begin
       InsertStrLen:= 3 * (e - BB.Line) + 2;
       //         #9#13#10 * lines-1 + (last line's #9 + null char)
-      StrToInsert := WStrAlloc(InsertStrLen);
+      StrToInsert := WideStrAlloc(InsertStrLen);
       Run := StrToInsert;
       Spaces := #9;
     end;
@@ -9592,7 +9592,7 @@ begin
     // build string to delete
     StrToDeleteLen := (FTabWidth + 2) * (e - BB.Line) + FTabWidth + 1;
     //                chars per line * lines-1    + last line + null char
-    StrToDelete := WStrAlloc(StrToDeleteLen);
+    StrToDelete := WideStrAlloc(StrToDeleteLen);
     StrToDelete[0] := #0;
     SomethingToDelete := False;
     for i := BB.Line to e-1 do

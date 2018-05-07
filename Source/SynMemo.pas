@@ -307,7 +307,7 @@ begin
       DestWide := PWideChar(Message.LParam);
       SourceWide := PWideChar(Lines[Message.WParam]);
       WStrLCopy(DestWide, SourceWide, PWord(Message.LParam)^);
-      Message.Result := WStrLen(DestWide);
+      Message.Result := Length(DestWide);
     end
     else
     begin
