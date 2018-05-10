@@ -111,6 +111,10 @@ const
 type
   TFontCharSet = 0..255;
 
+function SynCharNext(P: PWideChar): PWideChar; overload;
+function SynCharNext(P: PWideChar; out Element: String): PWideChar; overload;
+function SynUniElementsCount(S: string) : integer;
+
 function SynWideUpperCase(const S: string): string;
 function SynWideLowerCase(const S: string): string;
 function SynIsCharAlpha(const C: WideChar): Boolean;
@@ -176,8 +180,33 @@ uses
   SysConst,
   RTLConsts;
 
-// The Win9X fix for SynWideUpperCase and SynWideLowerCase was taken
-// from Troy Wolbrinks, TntUnicode-package.
+
+function SynCharNext(P: PWideChar): PWideChar;
+begin
+  Result := Windows.CharNext(P);
+end;
+
+function SynCharNext(P: PWideChar; out Element: String): PWideChar; overload;
+Var
+  Start : PWideChar;
+begin
+  Start := P;
+  Result := Windows.CharNext(P);
+  SetString(Element, Start, Result - Start);
+end;
+
+function SynUniElementsCount(S: string) : integer;
+Var
+  P : PWideChar;
+begin
+  Result := 0;
+  P := PWideChar(S);
+  while P^ <> #0 do
+  begin
+    P := Windows.CharNext(P);
+    Inc(Result);
+  end;
+end;
 
 function SynWideUpperCase(const S: string): string;
 var

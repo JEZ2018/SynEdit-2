@@ -147,7 +147,6 @@ type
   TSynEditorOption = (
     eoAltSetsColumnMode,       //Holding down the Alt Key will put the selection mode into columnar format
     eoAutoIndent,              //Will indent the caret on new lines with the same amount of leading white space as the preceding line
-    eoAutoSizeMaxScrollWidth,  //Automatically resizes the MaxScrollWidth property when inserting text
     eoDisableScrollArrows,     //Disables the scroll bar arrow buttons when you can't scroll in that direction any more
     eoDragDropEditing,         //Allows you to select a block of text and drag it within the document to another location
     eoDropFiles,               //Allows the editor accept OLE file drops
@@ -364,7 +363,6 @@ type
     fOrigRedoList: TSynEditUndoList;
     fLinesInWindow: Integer;
     fLeftChar: Integer;
-    fMaxScrollWidth: Integer;
     fPaintLock: Integer;
     fReadOnly: Boolean;
     fRightEdge: Integer;
@@ -549,7 +547,6 @@ type
     procedure SetLeftChar(Value: Integer);
     procedure SetLines(Value: TStrings);
     procedure SetLineText(Value: string);
-    procedure SetMaxScrollWidth(Value: Integer);
     procedure SetMaxUndo(const Value: Integer);
     procedure SetModified(Value: Boolean);
     procedure SetOptions(Value: TSynEditorOptions);
@@ -873,8 +870,6 @@ type
     property LineText: string read GetLineText write SetLineText;
     property Lines: TStrings read fLines write SetLines;
     property Marks: TSynEditMarkList read fMarkList;
-    property MaxScrollWidth: Integer read fMaxScrollWidth write SetMaxScrollWidth
-      default 1024;
     property Modified: Boolean read fModified write SetModified;
     property PaintLock: Integer read fPaintLock;
     property ReadOnly: Boolean read GetReadOnly write SetReadOnly default False;
@@ -1043,7 +1038,6 @@ type
     property InsertMode;
     property Keystrokes;
     property Lines;
-    property MaxScrollWidth;
     property MaxUndo;
     property Options;
     property OverwriteCaret;
@@ -1348,7 +1342,6 @@ begin
   ParentColor := False;
   TabStop := True;
   fInserting := True;
-  fMaxScrollWidth := 1024;
   fScrollBars := ssBoth;
   fBorderStyle := bsSingle;
   fInsertCaret := ctVerticalLine;
@@ -3786,10 +3779,7 @@ var
   SelChanged: Boolean;
 begin
   ActiveSelectionMode := SelectionMode;
-  if (eoScrollPastEol in Options) and not WordWrap then
-    Value.Char := MinMax(Value.Char, 1, fMaxScrollWidth + 1)
-  else
-    Value.Char := Max(Value.Char, 1);
+  Value.Char := Max(Value.Char, 1);
   Value.Line := MinMax(Value.Line, 1, Lines.Count);
   if (fActiveSelectionMode = smNormal) then
     if (Value.Line >= 1) and (Value.Line <= Lines.Count) then
@@ -3832,10 +3822,7 @@ begin
   ActiveSelectionMode := SelectionMode;
   if not (eoNoSelection in Options) then
   begin
-    if (eoScrollPastEol in Options) and not WordWrap then
-      Value.Char := MinMax(Value.Char, 1, fMaxScrollWidth + 1)
-    else
-      Value.Char := Max(Value.Char, 1);
+    Value.Char := Max(Value.Char, 1);
     Value.Line := MinMax(Value.Line, 1, Lines.Count);
     if (fActiveSelectionMode = smNormal) then
       if (Value.Line >= 1) and (Value.Line <= Lines.Count) then
@@ -3973,15 +3960,13 @@ procedure TCustomSynEdit.SetCaretXYEx(CallEnsureCursorPos: Boolean; Value: TBuff
 var
   nMaxX: Integer;
   vTriggerPaint: boolean;
+  S, TS : string;
 begin
   fCaretAtEOL := False;
   vTriggerPaint := HandleAllocated;
   if vTriggerPaint then
     DoOnPaintTransient(ttBefore);
-  if WordWrap then
-    nMaxX := MaxInt
-  else
-    nMaxX := MaxScrollWidth + 1;
+  nMaxX := MaxInt;
   if Value.Line > Lines.Count then
     Value.Line := Lines.Count;
   if Value.Line < 1 then
@@ -3996,13 +3981,21 @@ begin
     if not (eoScrollPastEol in fOptions) then
       nMaxX := Length(Lines[Value.Line - 1]) + 1;
   end;
-  if (Value.Char > nMaxX) and (not(eoScrollPastEol in Options) or
-    not(eoAutoSizeMaxScrollWidth in Options)) then
-  begin
+  if (Value.Char > nMaxX) and (not(eoScrollPastEol in Options)) then
     Value.Char := nMaxX;
-  end;
   if Value.Char < 1 then
     Value.Char := 1;
+
+  //Trim here
+  if (Value.Line <> fCaretY) and (eoTrimTrailingSpaces in fOptions) and
+     (fCaretY <= Lines.Count) and (fCaretY >= 1) then
+  begin
+    S := Lines[fCaretY-1];
+    TS := TrimTrailingSpaces(S);
+    if S <> TS then
+      Lines[fCaretY-1] := TS;
+  end;
+
   if (Value.Char <> fCaretX) or (Value.Line <> fCaretY) then
   begin
     IncPaintLock;
@@ -4139,12 +4132,7 @@ begin
     Value := 1;
 
   if eoScrollPastEol in Options then
-  begin
-    if eoAutoSizeMaxScrollWidth in Options then
       MaxVal := MaxInt - CharsInWindow
-    else
-      MaxVal := MaxScrollWidth - CharsInWindow + 1
-  end
   else
   begin
     MaxVal := TSynEditStringList(Lines).LengthOfLongestLine;
@@ -4167,12 +4155,6 @@ begin
     end
     else
       InvalidateLines(-1, -1);
-//    if (Options >= [eoAutoSizeMaxScrollWidth, eoScrollPastEol]) and
-//      (MaxScrollWidth < LeftChar + CharsInWindow) then
-//    begin
-//      MaxScrollWidth := LeftChar + CharsInWindow
-//    end
-//    else
     UpdateScrollBars;
     StatusChanged([scLeftChar]);
   end;
@@ -4757,10 +4739,7 @@ begin
 
       if (fScrollBars in [TScrollStyle.ssBoth, TScrollStyle.ssHorizontal]) and not WordWrap then
       begin
-        if eoScrollPastEol in Options then
-          nMaxScroll := MaxScrollWidth
-        else
-          nMaxScroll := Max(TSynEditStringList(Lines).LengthOfLongestLine, 1);
+        nMaxScroll := Max(TSynEditStringList(Lines).LengthOfLongestLine, 1);
         if nMaxScroll <= MAX_SCROLL then
         begin
           ScrollInfo.nMin := 1;
@@ -4999,12 +4978,9 @@ begin
       // Scrolls to start / end of the line
     SB_LEFT: LeftChar := 1;
     SB_RIGHT:
-      if eoScrollPastEol in Options then
-        LeftChar := MaxScrollWidth - CharsInWindow +1
-      else
-        // Simply set LeftChar property to the LengthOfLongestLine,
-        // it would do the range checking and constrain the value if necessary
-        LeftChar := TSynEditStringList(Lines).LengthOfLongestLine;
+      // Simply set LeftChar property to the LengthOfLongestLine,
+      // it would do the range checking and constrain the value if necessary
+      LeftChar := TSynEditStringList(Lines).LengthOfLongestLine;
       // Scrolls one char left / right
     SB_LINERIGHT: LeftChar := LeftChar + 1;
     SB_LINELEFT: LeftChar := LeftChar - 1;
@@ -5018,10 +4994,7 @@ begin
     SB_THUMBTRACK:
     begin
       FIsScrolling := True;
-      if eoScrollPastEol in Options then
-        iMaxWidth := MaxScrollWidth
-      else
-        iMaxWidth := Max(TSynEditStringList(Lines).LengthOfLongestLine, 1);
+      iMaxWidth := Max(TSynEditStringList(Lines).LengthOfLongestLine, 1);
       if iMaxWidth > MAX_SCROLL then
         LeftChar := MulDiv(iMaxWidth, Msg.Pos, MAX_SCROLL)
       else
@@ -5360,7 +5333,6 @@ end;
 procedure TCustomSynEdit.ListInserted(Sender: TObject; Index: Integer;
   aCount: Integer);
 var
-  L: Integer;
   vLastScan: Integer;
 //++ CodeFolding
   FoldIndex: Integer;
@@ -5394,19 +5366,11 @@ begin
 //++ Flicker Reduction
   Include(fStateFlags, sfScrollbarChanged);
 //-- Flicker Reduction
-
-  if (eoAutoSizeMaxScrollWidth in fOptions) then
-  begin
-    L := TSynEditStringList(Lines).ExpandedStringLengths[Index];
-    if L > MaxScrollWidth then
-      MaxScrollWidth := L;
-  end;
 end;
 
 procedure TCustomSynEdit.ListPutted(Sender: TObject; Index: Integer;
   aCount: Integer);
 var
-  L: Integer;
   vEndLine: Integer;
 //++ CodeFolding
   vLastScan: Integer;
@@ -5446,14 +5410,9 @@ begin
 
   InvalidateLines(Index + 1, vEndLine);
   InvalidateGutterLines(Index + 1, vEndLine);
-
-  if (eoAutoSizeMaxScrollWidth in fOptions) then
-  begin
-    L := TSynEditStringList(Lines).ExpandedStringLengths[Index];
-    if L > MaxScrollWidth then
-      MaxScrollWidth := L;
-  end;
-
+//++ Flicker Reduction
+  Include(fStateFlags, sfScrollbarChanged);
+//-- Flicker Reduction
 end;
 
 procedure TCustomSynEdit.ScanRanges;
@@ -5501,10 +5460,7 @@ var
   end;
 
 begin
-  if (eoScrollPastEol in Options) and not WordWrap then
-    Value.Char := MinMax(Value.Char, 1, fMaxScrollWidth + 1)
-  else
-    Value.Char := Max(Value.Char, 1);
+  Value.Char := Max(Value.Char, 1);
   Value.Line := MinMax(Value.Line, 1, Lines.Count);
   TempString := Lines[Value.Line - 1] + #0; //needed for CaretX = LineLength + 1
   if Value.Char > Length(TempString) then
@@ -6478,16 +6434,8 @@ begin
 end;
 
 procedure TCustomSynEdit.LinesHookChanged;
-var
-  iLongestLineLength: Integer;
 begin
   Invalidate;
-  if eoAutoSizeMaxScrollWidth in fOptions then
-  begin
-    iLongestLineLength := TSynEditStringList(Lines).LengthOfLongestLine;
-    if iLongestLineLength > MaxScrollWidth then
-      MaxScrollWidth := iLongestLineLength;
-  end;
   UpdateScrollBars;
 end;
 
@@ -6846,17 +6794,6 @@ begin
   end;
 end;
 
-procedure TCustomSynEdit.SetMaxScrollWidth(Value: Integer);
-begin
-  Value := MinMax(Value, 1, MaxInt - 1);
-  if MaxScrollWidth <> Value then
-  begin
-    fMaxScrollWidth := Value;
-    if eoScrollPastEol in Options then
-      UpdateScrollBars;
-  end;
-end;
-
 procedure TCustomSynEdit.EnsureCursorPosVisible;
 begin
   EnsureCursorPosVisibleEx(False);
@@ -7043,7 +6980,6 @@ var
   InsDelta: Integer;
   iUndoBegin, iUndoEnd: TBufferCoord;
   vCaretRow: Integer;
-  vTabTrim: integer;
   s: string;
   i: Integer;
 begin
@@ -7154,7 +7090,6 @@ begin
               TabBuffer := TSynEditStringList(Lines).ExpandedStrings[CaretY - 1];
               Len := Length(Temp);
               Caret := CaretXY;
-              vTabTrim := 0;
               if CaretX > Len + 1 then
               begin
                 Helper := '';
@@ -7171,23 +7106,13 @@ begin
                     if SpaceCount1 > 0 then
                     begin
                       BackCounter := CaretY - 2;
-                      //It's better not to have if statement inside loop
-                      if (eoTrimTrailingSpaces in Options) then
-                        while BackCounter >= 0 do
-                        begin
-                          SpaceCount2 := LeftSpacesEx(Lines[BackCounter], True);
-                          if (SpaceCount2 > 0) and (SpaceCount2 < SpaceCount1) then
-                            break;
-                          Dec(BackCounter);
-                        end
-                      else
-                        while BackCounter >= 0 do
-                        begin
-                          SpaceCount2 := LeftSpaces(Lines[BackCounter]);
-                          if (SpaceCount2 > 0) and (SpaceCount2 < SpaceCount1) then
-                            break;
-                          Dec(BackCounter);
-                        end;
+                      while BackCounter >= 0 do
+                      begin
+                        SpaceCount2 := LeftSpaces(Lines[BackCounter]);
+                        if (SpaceCount2 > 0) and (SpaceCount2 < SpaceCount1) then
+                          break;
+                        Dec(BackCounter);
+                      end;
                       if (BackCounter = -1) and (SpaceCount2 > SpaceCount1) then
                         SpaceCount2 := 0;
                     end;
@@ -7211,8 +7136,6 @@ begin
                   InternalCaretX := Length(Lines[CaretY - 1]) + 1;
                   Lines.Delete(CaretY);
                   DoLinesDeleted(CaretY+1, 1);
-                  if eoTrimTrailingSpaces in Options then
-                    Temp := TrimTrailingSpaces(Temp);
 
                   LineText := LineText + Temp;
                   Helper := #13#10;
@@ -7230,23 +7153,13 @@ begin
                     if SpaceCount1 > 0 then
                     begin
                       BackCounter := CaretY - 2;
-                      //It's better not to have if statement inside loop
-                      if (eoTrimTrailingSpaces in Options) then
-                        while BackCounter >= 0 do
-                        begin
-                          SpaceCount2 := LeftSpacesEx(Lines[BackCounter], True);
-                          if (SpaceCount2 > 0) and (SpaceCount2 < SpaceCount1) then
-                            break;
-                          Dec(BackCounter);
-                        end
-                      else
-                        while BackCounter >= 0 do
-                        begin
-                          SpaceCount2 := LeftSpaces(Lines[BackCounter]);
-                          if (SpaceCount2 > 0) and (SpaceCount2 < SpaceCount1) then
-                            break;
-                          Dec(BackCounter);
-                        end;
+                      while BackCounter >= 0 do
+                      begin
+                        SpaceCount2 := LeftSpaces(Lines[BackCounter]);
+                        if (SpaceCount2 > 0) and (SpaceCount2 < SpaceCount1) then
+                          break;
+                        Dec(BackCounter);
+                      end;
                       if (BackCounter = -1) and (SpaceCount2 > SpaceCount1) then
                         SpaceCount2 := 0;
                     end;
@@ -7293,42 +7206,24 @@ begin
                   fCaretX := fCaretX - (SpaceCount1 - SpaceCount2);
                   UpdateLastCaretX;
                   // Stores the previous "expanded" CaretX if the line contains tabs.
-                  if (eoTrimTrailingSpaces in Options) and (Len <> Length(TabBuffer)) then
-                    vTabTrim := CharIndex2CaretPos(CaretX, TabWidth, Temp);
-                  ProperSetLine(CaretY - 1, Temp);
+                  Lines[CaretY - 1] :=  Temp;
                   fStateFlags := fStateFlags + [sfCaretChanged];
                   StatusChanged([scCaretX]);
-                  // Calculates a delta to CaretX to compensate for trimmed tabs.
-                  if vTabTrim <> 0 then
-                    if Length(Temp) <> Length(LineText) then
-                      Dec(vTabTrim, CharIndex2CaretPos(CaretX, TabWidth, LineText))
-                    else
-                      vTabTrim := 0;
                 end
                 else begin
                   // delete char
                   counter := 1;
                   InternalCaretX := CaretX - counter;
                   // Stores the previous "expanded" CaretX if the line contains tabs.
-                  if (eoTrimTrailingSpaces in Options) and (Len <> Length(TabBuffer)) then
-                    vTabTrim := CharIndex2CaretPos(CaretX, TabWidth, Temp);
                   Helper := Copy(Temp, CaretX, counter);
                   Delete(Temp, CaretX, counter);
-                  ProperSetLine(CaretY - 1, Temp);
-                  // Calculates a delta to CaretX to compensate for trimmed tabs.
-                  if vTabTrim <> 0 then
-                    if Length(Temp) <> Length(LineText) then
-                      Dec(vTabTrim, CharIndex2CaretPos(CaretX, TabWidth, LineText))
-                    else
-                      vTabTrim := 0;
+                  Lines[CaretY - 1] := Temp;
                 end;
               end;
               if (Caret.Char <> CaretX) or (Caret.Line <> CaretY) then
               begin
                 fUndoList.AddChange(crSilentDelete, CaretXY, Caret, Helper,
                   smNormal);
-                if vTabTrim <> 0 then
-                  ForceCaretX(CaretX + vTabTrim);
               end;
             end;
             EnsureCursorPosVisible;
@@ -7356,14 +7251,14 @@ begin
               Caret.Char := CaretX + counter;
               Caret.Line := CaretY;
               Delete(Temp, CaretX, counter);
-              ProperSetLine(CaretY - 1, Temp);
+              Lines[CaretY - 1] := Temp;
             end
             else begin
               // join line with the line after
               if CaretY < Lines.Count then
               begin
                 Helper := UnicodeStringOfChar(#32, CaretX - 1 - Len);
-                ProperSetLine(CaretY - 1, Temp + Helper + Lines[CaretY]);
+                Lines[CaretY - 1] := Temp + Helper + Lines[CaretY];
                 Caret.Char := 1;
                 Caret.Line := CaretY + 1;
                 Helper := #13#10;
@@ -7499,7 +7394,7 @@ begin
                 SpaceCount1 := LeftSpacesEx(Temp,true);
                 Delete(Temp2, 1, CaretX - 1);
                 Lines.Insert(CaretY, GetLeftSpacing(SpaceCount1, True) + Temp2);
-                ProperSetLine(CaretY - 1, Temp);
+                Lines[CaretY - 1] := Temp;
                 fUndoList.AddChange(crLineBreak, CaretXY, CaretXY, Temp2,
                   smNormal);
                 if Command = ecLineBreak then
@@ -7532,10 +7427,11 @@ begin
               fUndoList.AddChange(crLineBreak, Caret, Caret, '', smNormal);   //KV
               if Command = ecLineBreak then
               begin
+                if SpaceCount2 > 0 then
+                  SpaceBuffer := Copy(Lines[BackCounter], 1, SpaceCount2);
                 InternalCaretXY := BufferCoord(1, CaretY +1);
                 if SpaceCount2 > 0 then
                 begin
-                  SpaceBuffer := Copy(Lines[BackCounter], 1, SpaceCount2);
                   for i := 1 to Length(SpaceBuffer) do
                     if SpaceBuffer[i] = #9 then
                       CommandProcessor(ecTab, #0, nil)
@@ -7635,22 +7531,12 @@ begin
 
               if fInserting then
               begin
-                if not WordWrap and not (eoAutoSizeMaxScrollWidth in Options)
-                   and (CaretX > MaxScrollWidth) then
-                begin
-                  Exit;
-                end;
                 Insert(AChar, Temp, CaretX);
-                if (eoTrimTrailingSpaces in Options) and ((AChar = #9) or (AChar = #32)) and (Length(TrimTrailingSpaces(LineText)) = 0) then
-                  InternalCaretX := GetExpandedLength(Temp, TabWidth) + 1
+                if Len = 0 then
+                  InternalCaretX := Length(Temp) + 1
                 else
-                begin
-                  if Len = 0 then
-                    InternalCaretX := Length(Temp) + 1
-                  else
-                    InternalCaretX := CaretX + 1;
-                end;
-                ProperSetLine(CaretY - 1, Temp);
+                  InternalCaretX := CaretX + 1;
+                Lines[CaretY - 1] := Temp;
                 if SpaceCount2 > 0 then
                 begin
                   BeginUndoBlock;
@@ -7683,7 +7569,7 @@ begin
                 Temp[CaretX] := AChar;
                 CaretNew.Char := CaretX + counter;
                 CaretNew.Line := CaretY;
-                ProperSetLine(CaretY - 1, Temp);
+                Lines[CaretY - 1] := Temp;
                 fUndoList.AddChange(crInsert, StartOfBlock, CaretNew, Helper,
                   smNormal);
                 InternalCaretX := CaretX + 1;
@@ -7853,7 +7739,7 @@ begin
               end;
               Insert(s, Temp, CaretX);
               InternalCaretX := (CaretX + Len);
-              ProperSetLine(CaretY - 1, Temp);
+              Lines[CaretY - 1] := Temp;
               if fInserting then
                 Helper := '';
               fUndoList.AddChange(crInsert, StartOfBlock, CaretXY, Helper,
@@ -8619,7 +8505,6 @@ var
   bSetDrag: Boolean;
   TmpBool: Boolean;
   bUpdateScroll: Boolean;
-  vTempBlockBegin, vTempBlockEnd : TBufferCoord;
 begin
   if (Value <> fOptions) then
   begin
@@ -8633,16 +8518,6 @@ begin
     bUpdateScroll := (Options * ScrollOptions) <> (Value * ScrollOptions);
 
     fOptions := Value;
-
-    // constrain caret position to MaxScrollWidth if eoScrollPastEol is enabled
-    InternalCaretXY := CaretXY;
-    if (eoScrollPastEol in Options) then
-    begin
-      vTempBlockBegin := BlockBegin;
-      vTempBlockEnd := BlockEnd;
-      SetBlockBegin(vTempBlockBegin);
-      SetBlockEnd(vTempBlockEnd);
-    end;
 
     // (un)register HWND as drop target
     if bSetDrag and not (csDesigning in ComponentState) and HandleAllocated then
@@ -9031,7 +8906,7 @@ var
   NewCaretX: integer;
   ChangeScroll: Boolean;
   nPhysX, nDistanceToTab, nSpacesToNextTabStop : Integer;
-  OldSelTabLine, vIgnoreSmartTabs: Boolean;
+  OldSelTabLine, vIgnoreSmartTabs, TrimTrailingActive: Boolean;
 begin
   // Provide Visual Studio like block indenting
   OldSelTabLine := SelTabLine;
@@ -9112,19 +8987,6 @@ begin
       Spaces := UnicodeStringOfChar(#32, i);
       NewCaretX := StartOfBlock.Char + i;
     end
-    else if (eoTrimTrailingSpaces in Options) and (StartOfBlock.Char > Length(LineText)) then
-    begin
-      // work-around for trimming Tabs
-      nPhysX := BufferToDisplayPos(CaretXY).Column;
-      if (eoSmartTabs in fOptions) and not vIgnoreSmartTabs and (iLine > -1) then
-      begin
-        i := BufferToDisplayPos( BufferCoord(MinLen+i, iLine+1) ).Column;
-        nDistanceToTab := i - nPhysX;
-      end
-      else
-        nDistanceToTab := TabWidth - ((nPhysX - 1) mod TabWidth);
-      NewCaretX := StartOfBlock.Char + nDistanceToTab;
-    end
     else begin
       if (eoSmartTabs in fOptions) and not vIgnoreSmartTabs and (iLine > -1) then
       begin
@@ -9157,13 +9019,14 @@ begin
       else begin
         Spaces := #9;
       end;
-      if (eoTrimTrailingSpaces in Options) and (Length(TrimTrailingSpaces(LineText)) = 0) then
-        NewCaretX := StartOfBlock.Char + GetExpandedLength(Spaces, TabWidth)
-      else
-        NewCaretX := StartOfBlock.Char + Length(Spaces);
+      NewCaretX := StartOfBlock.Char + Length(Spaces);
     end;
-
+    // Do not Trim
+    TrimTrailingActive := eoTrimTrailingSpaces in Options;
+    if TrimTrailingActive then Exclude(fOptions, eoTrimTrailingSpaces);
     SetSelTextPrimitive(Spaces);
+    if TrimTrailingActive then Include(fOptions, eoTrimTrailingSpaces);
+
     // Undo is already handled in SetSelText when SelectionMode is Column
     if fActiveSelectionMode <> smColumn then
     begin
@@ -9198,7 +9061,7 @@ var
   PrevLine, OldSelText: string;
   p: PWideChar;
   OldCaretXY: TBufferCoord;
-  ChangeScroll: Boolean;
+  TrimTrailingActive, ChangeScroll: Boolean;
 begin
   // Provide Visual Studio like block indenting
   if (eoTabIndent in Options) and ((SelTabBlock) or (SelTabLine)) then
@@ -9267,7 +9130,12 @@ begin
     OldCaretXY := CaretXY;
 
     OldSelText := SelText;
+
+    // Do not Trim
+    TrimTrailingActive := eoTrimTrailingSpaces in Options;
+    if TrimTrailingActive then Exclude(fOptions, eoTrimTrailingSpaces);
     SetSelTextPrimitive('');
+    if TrimTrailingActive then Include(fOptions, eoTrimTrailingSpaces);
 
     fUndoList.AddChange(crSilentDelete, BufferCoord(NewX, CaretY),
       OldCaretXY, OldSelText, smNormal);
@@ -10909,7 +10777,6 @@ end;
 
 procedure TCustomSynEdit.SetWordWrap(const Value: Boolean);
 var
-  vTempBlockBegin, vTempBlockEnd : TBufferCoord;
   vOldTopLine: Integer;
   vShowCaret: Boolean;
 begin
@@ -10931,15 +10798,6 @@ begin
     TopLine := LineToRow(vOldTopLine);
     UpdateScrollBars;
 
-    // constrain caret position to MaxScrollWidth if eoScrollPastEol is enabled
-    if (eoScrollPastEol in Options) then
-    begin
-      InternalCaretXY := CaretXY;
-      vTempBlockBegin := BlockBegin;
-      vTempBlockEnd := BlockEnd;
-      SetBlockBegin(vTempBlockBegin);
-      SetBlockEnd(vTempBlockEnd);
-    end;
     if vShowCaret then
       EnsureCursorPosVisible;
   end;
