@@ -62,7 +62,7 @@ uses
   SynEditMiscClasses,
   SynEditKeyCmds,
   Classes,
-  SysUtils;
+  SysUtils, System.ImageList;
 
 type
   TColorPopup = (cpGutter, cpRightEdge);
@@ -139,7 +139,6 @@ type
     gbOptions: TGroupBox;
     ckAutoIndent: TCheckBox;
     ckDragAndDropEditing: TCheckBox;
-    ckAutoSizeMaxWidth: TCheckBox;
     ckHalfPageScroll: TCheckBox;
     ckEnhanceEndKey: TCheckBox;
     ckScrollByOneLess: TCheckBox;
@@ -399,7 +398,6 @@ begin
     Self.HideSelection := TCustomSynEdit(Source).HideSelection;
     Self.InsertCaret := TCustomSynEdit(Source).InsertCaret;
     Self.OverwriteCaret := TCustomSynEdit(Source).OverwriteCaret;
-    Self.MaxScrollWidth := TCustomSynEdit(Source).MaxScrollWidth;
     Self.MaxUndo := TCustomSynEdit(Source).MaxUndo;
     Self.RightEdge := TCustomSynEdit(Source).RightEdge;
     Self.RightEdgeColor := TCustomSynEdit(Source).RightEdgeColor;
@@ -425,7 +423,6 @@ begin
     TCustomSynEdit(Dest).HideSelection := Self.HideSelection;
     TCustomSynEdit(Dest).InsertCaret := Self.InsertCaret;
     TCustomSynEdit(Dest).OverwriteCaret := Self.OverwriteCaret;
-    TCustomSynEdit(Dest).MaxScrollWidth := Self.MaxScrollWidth;
     TCustomSynEdit(Dest).MaxUndo := Self.MaxUndo;
     TCustomSynEdit(Dest).RightEdge := Self.RightEdge;
     TCustomSynEdit(Dest).RightEdgeColor := Self.RightEdgeColor;
@@ -549,7 +546,6 @@ begin
   labFont.Caption:= labFont.Font.Name + ' ' + IntToStr(labFont.Font.Size) + 'pt';
   //Options
   ckAutoIndent.Checked:= eoAutoIndent in FSynEdit.Options;
-  ckAutoSizeMaxWidth.Checked:= eoAutoSizeMaxScrollWidth in FSynEdit.Options;
   ckDragAndDropEditing.Checked:= eoDragDropEditing in FSynEdit.Options;
   ckWantTabs.Checked:= FSynEdit.WantTabs;
   ckSmartTabs.Checked:= eoSmartTabs in FSynEdit.Options;
@@ -628,7 +624,6 @@ begin
   FSynEdit.WantTabs:= ckWantTabs.Checked;
   vOptions := FSynEdit.Options; //Keep old values for unsupported options
   SetFlag(eoAutoIndent, ckAutoIndent.Checked);
-  SetFlag(eoAutoSizeMaxScrollWidth, ckAutoSizeMaxWidth.Checked);
   SetFlag(eoDragDropEditing, ckDragAndDropEditing.Checked);
   SetFlag(eoSmartTabs, ckSmartTabs.Checked);
   SetFlag(eoAltSetsColumnMode, ckAltSetsColumnMode.Checked);

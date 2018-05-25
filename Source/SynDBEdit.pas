@@ -153,7 +153,6 @@ type
     property InsertCaret;
     property InsertMode;
     property Keystrokes;
-    property MaxScrollWidth;
     property MaxUndo;
     property Options;
     property OverwriteCaret;
