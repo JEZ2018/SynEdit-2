@@ -7334,9 +7334,8 @@ begin
             SetBlockEnd(WP);
             ActiveSelectionMode := smNormal;
             Helper := SelText;
+            fUndoList.AddChange(crSilentDelete, WP, CaretXY, Helper, smNormal);
             SetSelTextPrimitive('');
-            fUndoList.AddChange(crSilentDelete, WP, CaretXY, Helper,
-              smNormal);
             InternalCaretXY := WP;
           end;
           DoOnPaintTransient(ttAfter);
