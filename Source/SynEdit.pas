@@ -7769,16 +7769,24 @@ begin
 //-- CodeFolding
 //++ CopyLine Up/Down
       ecCopyLineUp: begin
-        OutputDebugString('ecCopyLineUp');
+        SelectionMode := smColumn;
+        MoveCaretVert(-1, True);
+        Update;
       end;
       ecCopyLineDown: begin
-        OutputDebugString('ecCopyLineDown');
+        SelectionMode := smColumn;
+        MoveCaretVert(1, True);
+        Update;
       end;
       ecCopyLineLeft: begin
-        OutputDebugString('ecCopyLineLeft');
+        SelectionMode := smColumn;
+        MoveCaretHorz(-1, True);
+        Update;
       end;
       ecCopyLineRight: begin
-        OutputDebugString('ecCopyLineRight');
+        SelectionMode := smColumn;
+        MoveCaretHorz(1, True);
+        Update;
       end;
 //-- CopyLine Up/Down
     end;
