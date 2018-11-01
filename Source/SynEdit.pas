@@ -7767,6 +7767,20 @@ begin
       ecFoldRegions: begin CollapseFoldType(FoldRegionType) end;
       ecUnfoldRegions: begin UnCollapseFoldType(FoldRegionType) end;
 //-- CodeFolding
+//++ CopyLine Up/Down
+      ecCopyLineUp: begin
+        OutputDebugString('ecCopyLineUp');
+      end;
+      ecCopyLineDown: begin
+        OutputDebugString('ecCopyLineDown');
+      end;
+      ecCopyLineLeft: begin
+        OutputDebugString('ecCopyLineLeft');
+      end;
+      ecCopyLineRight: begin
+        OutputDebugString('ecCopyLineRight');
+      end;
+//-- CopyLine Up/Down
     end;
   finally
     DecPaintLock;

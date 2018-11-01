@@ -212,6 +212,13 @@ const
   ecUnfoldRegions    = 732;
   //-- CodeFolding
 
+  //++ CopyLine Up/Down
+  ecCopyLineUp    = 733;
+  ecCopyLineDown  = 734;
+  ecCopyLineLeft  = 735;
+  ecCopyLineRight = 736;
+  //-- CopyLine Up/Down
+
   ecUserFirst       = 1001; // Start of user-defined commands
 
 type
@@ -309,7 +316,7 @@ uses
 
 const
 //++ CodeFolding
-  EditorCommandStrs: array[0..112] of TIdentMapEntry = (
+  EditorCommandStrs: array[0..116] of TIdentMapEntry = (
 //-- CodeFolding
     (Value: ecNone; Name: 'ecNone'),
     (Value: ecLeft; Name: 'ecLeft'),
@@ -424,8 +431,15 @@ const
     (Value: ecUnfoldLevel2; Name:'ecUnfoldLevel2'),
     (Value: ecUnfoldLevel3; Name:'ecUnfoldLevel3'),
     (Value: ecFoldRegions; Name:'ecFoldRanges'),
-    (Value: ecUnfoldRegions; Name:'ecUnfoldRanges'));
+    (Value: ecUnfoldRegions; Name:'ecUnfoldRanges'),
 //-- CodeFolding
+//++ CopyLine Up/Down
+    (Value: ecCopyLineUp; Name:'ecCopyLineUp'),
+    (Value: ecCopyLineDown; Name:'ecCopyLineDown'),
+    (Value: ecCopyLineLeft; Name:'ecCopyLineLeft'),
+    (Value: ecCopyLineRight; Name:'ecCopyLineRight'));
+//-- CopyLine Up/Down
+
 procedure GetEditorCommandValues(Proc: TGetStrProc);
 var
   i: integer;
@@ -839,6 +853,12 @@ begin
   AddKey(ecUnfoldLevel2, ord('K'), [ssCtrl, ssShift], Ord('2'), [ssCtrl, ssShift]);
   AddKey(ecUnfoldLevel3, ord('K'), [ssCtrl, ssShift], Ord('3'), [ssCtrl, ssShift]);
 //-- CodeFolding
+//++ CopyLine Up/Down
+  AddKey(ecCopyLineUp, SYNEDIT_UP, [ssShift, ssAlt]);
+  AddKey(ecCopyLineDown, SYNEDIT_DOWN, [ssShift, ssAlt]);
+  AddKey(ecCopyLineLeft, SYNEDIT_LEFT, [ssShift, ssAlt]);
+  AddKey(ecCopyLineRight, SYNEDIT_RIGHT, [ssShift, ssAlt]);
+//-- CopyLine Up/Down
 end;
 
 procedure TSynEditKeyStrokes.SetItem(Index: Integer; Value: TSynEditKeyStroke);
