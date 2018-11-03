@@ -215,9 +215,11 @@ const
   //++ CopyLine Up/Down
   ecCopyLineUp    = 733;
   ecCopyLineDown  = 734;
-  ecCopyLineLeft  = 735;
-  ecCopyLineRight = 736;
   //-- CopyLine Up/Down
+  //++ MoveLine Up/Down
+  ecMoveLineUp    = 735;
+  ecMoveLineDown  = 736;
+  //-- MoveLine Up/Down
 
   ecUserFirst       = 1001; // Start of user-defined commands
 
@@ -436,9 +438,11 @@ const
 //++ CopyLine Up/Down
     (Value: ecCopyLineUp; Name:'ecCopyLineUp'),
     (Value: ecCopyLineDown; Name:'ecCopyLineDown'),
-    (Value: ecCopyLineLeft; Name:'ecCopyLineLeft'),
-    (Value: ecCopyLineRight; Name:'ecCopyLineRight'));
 //-- CopyLine Up/Down
+//++ MoveLine Up/Down
+    (Value: ecMoveLineUp; Name:'ecMoveLineUp'),
+    (Value: ecMoveLineDown; Name:'ecMoveLineDown'));
+//-- MoveLine Up/Down
 
 procedure GetEditorCommandValues(Proc: TGetStrProc);
 var
@@ -856,9 +860,11 @@ begin
 //++ CopyLine Up/Down
   AddKey(ecCopyLineUp, SYNEDIT_UP, [ssShift, ssAlt]);
   AddKey(ecCopyLineDown, SYNEDIT_DOWN, [ssShift, ssAlt]);
-  AddKey(ecCopyLineLeft, SYNEDIT_LEFT, [ssShift, ssAlt]);
-  AddKey(ecCopyLineRight, SYNEDIT_RIGHT, [ssShift, ssAlt]);
 //-- CopyLine Up/Down
+//++ MoveLine Up/Down
+  AddKey(ecMoveLineUp, SYNEDIT_UP, [ssAlt]);
+  AddKey(ecMoveLineDown, SYNEDIT_DOWN, [ssAlt]);
+//-- MoveLine Up/Down
 end;
 
 procedure TSynEditKeyStrokes.SetItem(Index: Integer; Value: TSynEditKeyStroke);

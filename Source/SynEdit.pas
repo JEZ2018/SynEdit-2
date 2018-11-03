@@ -7769,26 +7769,31 @@ begin
 //-- CodeFolding
 //++ CopyLine Up/Down
       ecCopyLineUp: begin
-        SelectionMode := smColumn;
-        MoveCaretVert(-1, True);
-        Update;
+        Lines.Insert(CaretY, LineText);
       end;
       ecCopyLineDown: begin
-        SelectionMode := smColumn;
-        MoveCaretVert(1, True);
-        Update;
-      end;
-      ecCopyLineLeft: begin
-        SelectionMode := smColumn;
-        MoveCaretHorz(-1, True);
-        Update;
-      end;
-      ecCopyLineRight: begin
-        SelectionMode := smColumn;
-        MoveCaretHorz(1, True);
-        Update;
+        Lines.Insert(CaretY, LineText);
+        MoveCaretVert(1, False);
       end;
 //-- CopyLine Up/Down
+//++ MoveLine Up/Down
+      ecMoveLineUp: begin
+        if CaretY > 1 then begin
+          Temp := Lines[CaretY-2];
+          Lines[CaretY-2] := Lines[CaretY-1];
+          Lines[CaretY-1] := Temp;
+          MoveCaretVert(-1, False);
+        end;
+      end;
+      ecMoveLineDown: begin
+        if CaretY < Lines.Count then begin
+          Temp := Lines[CaretY-1];
+          Lines[CaretY-1] := Lines[CaretY];
+          Lines[CaretY] := Temp;
+          MoveCaretVert(1, False);
+        end;
+      end;
+//-- MoveLine Up/Down
     end;
   finally
     DecPaintLock;
