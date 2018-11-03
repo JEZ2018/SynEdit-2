@@ -7779,6 +7779,7 @@ begin
 //++ MoveLine Up/Down
       ecMoveLineUp: begin
         if CaretY > 1 then begin
+          // TODO: Lines.Exchange doesn't wotk
           Temp := Lines[CaretY-2];
           Lines[CaretY-2] := Lines[CaretY-1];
           Lines[CaretY-1] := Temp;
@@ -7787,6 +7788,7 @@ begin
       end;
       ecMoveLineDown: begin
         if CaretY < Lines.Count then begin
+          // TODO: Lines.Exchange doesn't wotk
           Temp := Lines[CaretY-1];
           Lines[CaretY-1] := Lines[CaretY];
           Lines[CaretY] := Temp;
