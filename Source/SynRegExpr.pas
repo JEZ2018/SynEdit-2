@@ -53,7 +53,6 @@ interface
 {$WARN UNSAFE_CODE OFF} // Suppress .Net warnings
 
 uses
-  SynUnicode,
   Classes,  // TStrings in Split method
   SysUtils; // Exception
 

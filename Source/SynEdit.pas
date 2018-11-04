@@ -4239,12 +4239,8 @@ var
 
   procedure DeleteSelection;
   var
-    x, MarkOffset, MarkOffset2: Integer;
-    UpdateMarks: Boolean;
+    x: Integer;
   begin
-    UpdateMarks := False;
-    MarkOffset := 0;
-    MarkOffset2 := 0;
     case fActiveSelectionMode of
       smNormal:
         begin
@@ -4253,8 +4249,6 @@ var
               // Create a string that contains everything on the first line up
               // to the selection mark, and everything on the last line after
               // the selection mark.
-            if BB.Char > 1 then
-              MarkOffset2 := 1;
             TempString := Copy(Lines[BB.Line - 1], 1, BB.Char - 1) +
               Copy(Lines[BE.Line - 1], BE.Char, MaxInt);
               // Delete all lines in the selection range.
@@ -4264,7 +4258,6 @@ var
               TempString := TrimTrailingSpaces(TempString);
             Lines[BB.Line - 1] := TempString;
           end;
-          UpdateMarks := True;
           InternalCaretXY := BB;
         end;
       smColumn:
@@ -4298,13 +4291,8 @@ var
           end;
           // smLine deletion always resets to first column.
           InternalCaretXY := BufferCoord(1, BB.Line);
-          UpdateMarks := TRUE;
-          MarkOffset := 1;
         end;
     end;
-    // Update marks
-    if UpdateMarks then
-      DoLinesDeleted(BB.Line + MarkOffset2, BE.Line - BB.Line + MarkOffset);
   end;
 
   procedure InsertText;
@@ -4507,7 +4495,6 @@ var
   var
     StartLine: Integer;
     StartCol: Integer;
-    InsertedLines: Integer;
   begin
     if Value = '' then
       Exit;
@@ -4516,22 +4503,11 @@ var
     StartCol := CaretX;
     case PasteMode of
       smNormal:
-        InsertedLines := InsertNormal;
+        InsertNormal;
       smColumn:
-        InsertedLines := InsertColumn;
+        InsertColumn;
       smLine:
-        InsertedLines := InsertLine;
-    else
-      InsertedLines := 0;
-    end;
-    // We delete selected based on the current selection mode, but paste
-    // what's on the clipboard according to what it was when copied.
-    // Update marks
-    if InsertedLines > 0 then
-    begin
-      if (PasteMode = smNormal) and (StartCol > 1) then
-        Inc(StartLine);
-      DoLinesInserted(StartLine, InsertedLines);
+        InsertLine;
     end;
     // Force caret reset
     InternalCaretXY := CaretXY;
@@ -5311,6 +5287,8 @@ procedure TCustomSynEdit.ListDeleted(Sender: TObject; aIndex: Integer;
 Var
   vLastScan: Integer;
 begin
+  DoLinesDeleted(aIndex, aCount);
+
   vLastScan := aIndex;
   if Assigned(fHighlighter) and (Lines.Count > 0) then
     vLastScan := ScanFrom(aIndex);
@@ -5340,6 +5318,8 @@ var
 //++ CodeFolding
   FoldIndex: Integer;
 begin
+  DoLinesInserted(Index, aCount);
+
   vLastScan := Index;
 //-- CodeFolding
   if Assigned(fHighlighter) and (Lines.Count > 0) then
@@ -6120,7 +6100,6 @@ begin
           end
           else
             ProperSetLine(CaretY - 1, Item.ChangeStr);
-          DoLinesDeleted(CaretY + 1, 1);
           fRedoList.AddChange(Item.ChangeReason, Item.ChangeStartPos,
             Item.ChangeEndPos, '', Item.ChangeSelMode);
         end;
@@ -7138,7 +7117,6 @@ begin
                   InternalCaretY := CaretY - 1;
                   InternalCaretX := Length(Lines[CaretY - 1]) + 1;
                   Lines.Delete(CaretY);
-                  DoLinesDeleted(CaretY+1, 1);
 
                   LineText := LineText + Temp;
                   Helper := #13#10;
@@ -7266,7 +7244,6 @@ begin
                 Caret.Line := CaretY + 1;
                 Helper := #13#10;
                 Lines.Delete(CaretY);
-                DoLinesDeleted(CaretY +1, 1);
               end;
             end;
             if (Caret.Char <> CaretX) or (Caret.Line <> CaretY) then
@@ -7358,7 +7335,6 @@ begin
             Helper := Helper + #13#10;
             fUndoList.AddChange(crSilentDeleteAfterCursor, BufferCoord(1, CaretY),
               BufferCoord(1, CaretY + 1), Helper, smNormal);
-            DoLinesDeleted(CaretY, 1);
           end;
           InternalCaretXY := BufferCoord(1, CaretY); // like seen in the Delphi editor
         end;
@@ -7464,7 +7440,6 @@ begin
             if Command = ecLineBreak then
               InternalCaretY := CaretY + 1;
           end;
-          DoLinesInserted(CaretY - InsDelta, 1);
           BlockBegin := CaretXY;
           BlockEnd   := CaretXY;
           EnsureCursorPosVisible;
