@@ -557,7 +557,6 @@ type
     procedure SetSearchEngine(Value: TSynEditSearchCustom);
     procedure SetSelectionMode(const Value: TSynSelectionMode);
     procedure SetActiveSelectionMode(const Value: TSynSelectionMode);
-    procedure SetSelTextExternal(const Value: string);
     procedure SetTabWidth(Value: Integer);
     procedure SynSetText(const Value: string);
     procedure SetTopLine(Value: Integer);
@@ -651,9 +650,9 @@ type
     procedure SetName(const Value: TComponentName); override;
     procedure SetReadOnly(Value: boolean); virtual;
     procedure SetWantReturns(Value: Boolean);
-    procedure SetSelTextPrimitive(const Value: string);
+    procedure SetSelText(const Value: string);
     procedure SetSelTextPrimitiveEx(PasteMode: TSynSelectionMode; Value: PWideChar;
-      AddToUndoList: Boolean);
+      AddToUndoList: Boolean = True; SilentDelete: Boolean = False);
     procedure SetWantTabs(Value: Boolean);
     procedure StatusChanged(AChanges: TSynStatusChanges);
     // If the translations requires Data, memory will be allocated for it via a
@@ -878,7 +877,7 @@ type
     property SelLength: Integer read GetSelLength write SetSelLength;
     property SelTabBlock: Boolean read GetSelTabBlock;
     property SelTabLine: Boolean read GetSelTabLine;
-    property SelText: string read GetSelText write SetSelTextExternal;
+    property SelText: string read GetSelText write SetSelText;
     property StateFlags: TSynStateFlags read fStateFlags;
     property Text: string read SynGetText write SynSetText;
     property TopLine: Integer read fTopLine write SetTopLine;
@@ -3662,8 +3661,6 @@ end;
 procedure TCustomSynEdit.PasteFromClipboard;
 var
   AddPasteEndMarker: boolean;
-  vStartOfBlock: TBufferCoord;
-  vEndOfBlock: TBufferCoord;
   StoredPaintLock: Integer;
   PasteMode: TSynSelectionMode;
   Mem: HGLOBAL;
@@ -3672,7 +3669,6 @@ begin
   if not CanPaste then
     exit;
   DoOnPaintTransient(ttBefore);
-  BeginUndoBlock;
   AddPasteEndMarker := False;
   PasteMode := SelectionMode;
   try
@@ -3699,47 +3695,11 @@ begin
     end;
     fUndoList.AddChange(crPasteBegin, BlockBegin, BlockEnd, '', smNormal);
     AddPasteEndMarker := True;
-    if SelAvail then
-    begin
-      fUndoList.AddChange(crDelete, fBlockBegin, fBlockEnd, SelText,
-        fActiveSelectionMode);
-    end
-    else
-      ActiveSelectionMode := SelectionMode;
-
-    if SelAvail then
-    begin
-      vStartOfBlock := BlockBegin;
-      vEndOfBlock := BlockEnd;
-      fBlockBegin := vStartOfBlock;
-      fBlockEnd := vEndOfBlock;
-
-      // Pasting always occurs at column 0 when current selection is
-      // smLine type
-      if fActiveSelectionMode = smLine then
-        vStartOfBlock.Char := 1;
-    end
-    else
-      vStartOfBlock := CaretXY;
 
     SetSelTextPrimitiveEx(PasteMode, PWideChar(GetClipboardText), True);
-    vEndOfBlock := BlockEnd;
-    if PasteMode = smNormal then
-      fUndoList.AddChange(crPaste, vStartOfBlock, vEndOfBlock, SelText,
-        PasteMode)
-    else if PasteMode = smColumn then
-      // Do nothing. Moved to InsertColumn
-    else if PasteMode = smLine then
-      if CaretX = 1 then
-        fUndoList.AddChange(crPaste, BufferCoord(1, vStartOfBlock.Line),
-          BufferCoord(CharsInWindow, vEndOfBlock.Line - 1), SelText, smLine)
-      else
-        fUndoList.AddChange(crPaste, BufferCoord(1, vStartOfBlock.Line),
-          vEndOfBlock, SelText, smNormal);
   finally
     if AddPasteEndMarker then
       fUndoList.AddChange(crPasteEnd, BlockBegin, BlockEnd, '', smNormal);
-    EndUndoBlock;
   end;
 
   // ClientRect can be changed by UpdateScrollBars if eoHideShowScrollBars
@@ -4220,7 +4180,7 @@ begin
   end;
 end;
 
-procedure TCustomSynEdit.SetSelTextPrimitive(const Value: string);
+procedure TCustomSynEdit.SetSelText(const Value: string);
 begin
   SetSelTextPrimitiveEx(fActiveSelectionMode, PWideChar(Value), True);
 end;
@@ -4231,21 +4191,18 @@ end;
 // as we would typically want the cursor to stay where it is.
 // To fix this (in the absence of a better idea), I changed the code in
 // DeleteSelection not to trim the string if eoScrollPastEol is not set.
-procedure TCustomSynEdit.SetSelTextPrimitiveEx(PasteMode: TSynSelectionMode;
-  Value: PWideChar; AddToUndoList: Boolean);
+procedure TCustomSynEdit.SetSelTextPrimitiveEx(PasteMode: TSynSelectionMode; Value: PWideChar;
+      AddToUndoList: Boolean = True; SilentDelete: Boolean = False);
 {
    Works in two stages:
-     -  First deletes selection taking into account ActiveSelectionMode.
+     -  First deletes selection.
      -  Second inserts text taking into account PasteMode.
-     -  Note: AddToUndoList only adds Insertion changes to the Undo List and only
-        when PastMode is smColumn
-    TODO: If AddUndoChanges is on add undo actions for all deletions and insertions
-          This would simplify code witch uses SetSelTextPrimitive and
-          SetSelTextPrimitiveEx
+     -  SilentDelete does not restore selection on undo
+     -  The routine takes full care of undo/redo
 }
 var
   BB, BE: TBufferCoord;
-  TempString: string;
+  TempString, SelectedText: string;
 
   procedure DeleteSelection;
   var
@@ -4524,26 +4481,53 @@ begin
   try
     BB := BlockBegin;
     BE := BlockEnd;
-    if SelAvail then
-    begin
-//      if AddToUndoList and Length(Value) = 0 then
-//      begin
-//        if (BB.Line < BE.Line) or ((BB.Line = BE.Line) and (BB.Char < BE.Char)) then
-//          fUndoList.AddChange(crDelete, BB, BE, SelText, fActiveSelectionMode)
-//        else
-//          fUndoList.AddChange(crDeleteAfterCursor, BB, BE, SelText, fActiveSelectionMode);
-//      end;
-      DeleteSelection;
-      InternalCaretXY := BB;
+
+    SelectedText := SelText;
+
+    if AddToUndoList and (Length(Value) > 0) then
+      BeginUndoBlock;
+    try
+      if SelectedText <> '' then
+      begin
+        if AddToUndoList then
+        begin
+          if SilentDelete then
+            fUndoList.AddChange(crSilentDelete, fBlockBegin, fBlockEnd,
+              SelectedText, fActiveSelectionMode)
+          else
+            fUndoList.AddChange(crDelete,  fBlockBegin, fBlockEnd,
+              SelectedText, fActiveSelectionMode);
+        end;
+        DeleteSelection;
+        InternalCaretXY := BB;
+      end;
+
+      if Length(Value) > 0 then
+      begin
+        InsertText;
+        // In scColumn mode undo is added inside InsertColumn
+        if AddToUndoList and (PasteMode <> smColumn) then
+        begin
+          BE := CaretXY;
+          if PasteMode = smLine then
+          begin
+            BB.Char := 1;
+            BE.Char := MaxInt;
+            BE.Line := BE.Line - 1;
+          end;
+          fUndoList.AddChange(crInsert, BB, BE, '', PasteMode)
+        end;
+      end;
+
+      if CaretY < 1 then
+        InternalCaretY := 1;
+    finally
+      DecPaintLock;
+      Lines.EndUpdate;
     end;
-    // if Length(Vaule) > 0 then
-    if (Value <> nil) and (Value[0] <> #0) then
-      InsertText;
-    if CaretY < 1 then
-      InternalCaretY := 1;
   finally
-    DecPaintLock;
-    Lines.EndUpdate;
+    if AddToUndoList and (Length(Value) > 0) then
+       EndUndoBlock;
   end;
 end;
 
@@ -5510,11 +5494,15 @@ end;
 procedure TCustomSynEdit.InsertBlock(const BB, BE: TBufferCoord; ChangeStr: PWideChar;
   AddToUndoList: Boolean);
 // used by BlockIndent and Redo
+Var
+  OldSelectinonMode : TSynSelectionMode;
 begin
   SetCaretAndSelection(BB, BB, BE);
+  OldSelectinonMode := ActiveSelectionMode;
   ActiveSelectionMode := smColumn;
   SetSelTextPrimitiveEx(smColumn, ChangeStr, AddToUndoList);
   StatusChanged([scSelection]);
+  ActiveSelectionMode := OldSelectinonMode;
 end;
 
 procedure TCustomSynEdit.Redo;
@@ -5617,9 +5605,11 @@ var
   CaretPt: TBufferCoord;
   ChangeScrollPastEol: boolean;
   BeginX: integer;
+  OldSelectionMode : TSynSelectionMode;
 begin
   ChangeScrollPastEol := not (eoScrollPastEol in Options);
   Item := fRedoList.PopItem;
+  OldSelectionMode := ActiveSelectionMode;
   if Assigned(Item) then
   try
     ActiveSelectionMode := Item.ChangeSelMode;
@@ -5721,17 +5711,9 @@ begin
            fUndoList.AddChange(Item.ChangeReason, Item.ChangeStartPos,
              Item.ChangeEndPos, Item.ChangeStr, Item.ChangeSelMode);
          end;
-      crWhiteSpaceAdd:
-        begin
-          fUndoList.AddChange(Item.ChangeReason, Item.ChangeStartPos,
-             Item.ChangeEndPos, '', Item.ChangeSelMode);
-          SetCaretAndSelection(Item.ChangeEndPos, Item.ChangeEndPos,
-            Item.ChangeEndPos);
-          SetSelTextPrimitiveEx(Item.ChangeSelMode, PWideChar(Item.ChangeStr), True);
-          InternalCaretXY := Item.ChangeStartPos;
-        end;
     end;
   finally
+    ActiveSelectionMode := OldSelectionMode;
     fUndoList.InsideRedo := False;
     if ChangeScrollPastEol then
       Exclude(fOptions, eoScrollPastEol);
@@ -6063,11 +6045,10 @@ begin
             False );
           TmpPos := Item.ChangeEndPos;
           if Item.ChangeReason = crSilentDelete then
-            InternalCaretXY := TmpPos
-          else begin
+            SetCaretAndSelection(TmpPos, TmpPos, TmpPos)
+          else
             SetCaretAndSelection(TmpPos, Item.ChangeStartPos,
               Item.ChangeEndPos);
-          end;
           fRedoList.AddChange(Item.ChangeReason, Item.ChangeStartPos,
             Item.ChangeEndPos, '', Item.ChangeSelMode);
           if Item.ChangeReason = crDeleteAll then begin
@@ -6128,8 +6109,6 @@ begin
             Item.ChangeEndPos);
           TmpStr := SelText;
           SetSelTextPrimitiveEx(Item.ChangeSelMode, PWideChar(Item.ChangeStr), True);
-          fRedoList.AddChange(Item.ChangeReason, Item.ChangeStartPos,
-            Item.ChangeEndPos, TmpStr, Item.ChangeSelMode);
           InternalCaretXY := Item.ChangeStartPos;
         end;
     end;
@@ -6897,13 +6876,6 @@ end;
 procedure TCustomSynEdit.ExecuteCommand(Command: TSynEditorCommand; AChar: WideChar;
   Data: pointer);
 
-  procedure SetSelectedTextEmpty;
-  begin
-    fUndoList.AddChange(crDelete, fBlockBegin, fBlockEnd, SelText,
-      fActiveSelectionMode);
-    SetSelTextPrimitive('');
-  end;
-
   procedure ForceCaretX(aCaretX: integer);
   var
     vRestoreScroll: boolean;
@@ -6938,7 +6910,6 @@ var
   CaretNew: TBufferCoord;
   counter: Integer;
   InsDelta: Integer;
-  iUndoBegin, iUndoEnd: TBufferCoord;
   vCaretRow: Integer;
   s: string;
   i: Integer;
@@ -7044,7 +7015,7 @@ begin
           DoOnPaintTransientEx(ttBefore,true);
           try
             if SelAvail then
-              SetSelectedTextEmpty
+              SetSelText('')
             else begin
               Temp := LineText;
               TabBuffer := TSynEditStringList(Lines).ExpandedStrings[CaretY - 1];
@@ -7195,7 +7166,7 @@ begin
           DoOnPaintTransient(ttBefore);
 
           if SelAvail then
-            SetSelectedTextEmpty
+            SetSelText('')
           else begin
             // Call UpdateLastCaretX. Even though the caret doesn't move, the
             // current caret position should "stick" whenever text is modified.
@@ -7258,12 +7229,10 @@ begin
           end;
           if (WP.Char <> CaretX) or (WP.Line <> CaretY) then
           begin
-            SetBlockBegin(CaretXY);
-            SetBlockEnd(WP);
+            SetBlockBegin(WP);
+            SetBlockEnd(CaretXY);
             ActiveSelectionMode := smNormal;
-            Helper := SelText;
-            SetSelTextPrimitive(UnicodeStringOfChar(' ', CaretX - BlockBegin.Char));
-            fUndoList.AddChange(crSilentDelete, WP, CaretXY, Helper, smNormal);
+            SetSelTextPrimitiveEx(ActiveSelectionMode, '', True, True);
             InternalCaretXY := CaretXY;
           end;
         end;
@@ -7278,12 +7247,10 @@ begin
           end;
           if (WP.Char <> CaretX) or (WP.Line <> CaretY) then
           begin
-            SetBlockBegin(CaretXY);
-            SetBlockEnd(WP);
+            SetBlockBegin(WP);
+            SetBlockEnd(CaretXY);
             ActiveSelectionMode := smNormal;
-            Helper := SelText;
-            fUndoList.AddChange(crSilentDelete, WP, CaretXY, Helper, smNormal);
-            SetSelTextPrimitive('');
+            SetSelTextPrimitiveEx(ActiveSelectionMode, '', True, True);
             InternalCaretXY := WP;
           end;
           DoOnPaintTransient(ttAfter);
@@ -7320,14 +7287,7 @@ begin
           UndoList.BeginBlock;
           try
           if SelAvail then
-          begin
-            Helper := SelText;
-            iUndoBegin := fBlockBegin;
-            iUndoEnd := fBlockEnd;
-            SetSelTextPrimitive('');
-            fUndoList.AddChange(crDelete, iUndoBegin, iUndoEnd, Helper,
-              fActiveSelectionMode);
-          end;
+            SetSelText('');
           Temp := LineText;
           Temp2 := Temp;
           // This is sloppy, but the Right Thing would be to track the column of markers
@@ -7431,28 +7391,8 @@ begin
         if not ReadOnly and (AChar >= #32) and (AChar <> #127) then
         begin
           if SelAvail then
-          begin
-            BeginUndoBlock;
-            try
-              Helper := SelText;
-              iUndoBegin := fBlockBegin;
-              iUndoEnd := fBlockEnd;
-              StartOfBlock := BlockBegin;
-              if fActiveSelectionMode = smLine then
-                StartOfBlock.Char := 1;
-              fUndoList.AddChange(crDelete, iUndoBegin, iUndoEnd, Helper,
-                fActiveSelectionMode);
-              SetSelTextPrimitive(AChar);
-              if fActiveSelectionMode <> smColumn then
-              begin
-                fUndoList.AddChange(crInsert, StartOfBlock, BlockEnd, '',
-                  smNormal);
-              end;
-            finally
-              EndUndoBlock;
-            end;
-          end
-          else
+            SetSelText(AChar)
+         else
           begin
             SpaceCount2 := 0;
             Temp := LineText;
@@ -7657,17 +7597,7 @@ begin
           S := PWideChar(Data);
           if SelAvail then
           begin
-            BeginUndoBlock;
-            try
-              fUndoList.AddChange(crDelete, fBlockBegin, fBlockEnd, Helper,
-                smNormal);
-              StartOfBlock := fBlockBegin;
-              SetSelTextPrimitive(s);
-              fUndoList.AddChange(crInsert, fBlockBegin, fBlockEnd, Helper,
-                smNormal);
-            finally
-              EndUndoBlock;
-            end;
+            SetSelText(s);
             InvalidateGutterLines(-1, -1);
           end
           else
@@ -8056,31 +7986,6 @@ procedure TCustomSynEdit.ClearUndo;
 begin
   fUndoList.Clear;
   fRedoList.Clear;
-end;
-
-procedure TCustomSynEdit.SetSelTextExternal(const Value: string);
-var
-  StartOfBlock, EndOfBlock: TBufferCoord;
-begin
-  BeginUndoBlock;
-  try
-    if SelAvail then
-    begin
-      fUndoList.AddChange(crDelete, fBlockBegin, fBlockEnd,
-        SelText, fActiveSelectionMode);
-    end
-    else
-      ActiveSelectionMode := SelectionMode;
-    StartOfBlock := BlockBegin;
-    EndOfBlock := BlockEnd;
-    fBlockBegin := StartOfBlock;
-    fBlockEnd := EndOfBlock;
-    SetSelTextPrimitive(Value);
-    if (Value <> '') and (fActiveSelectionMode <> smColumn) then
-      fUndoList.AddChange(crInsert, StartOfBlock, BlockEnd, '', fActiveSelectionMode);
-  finally
-    EndUndoBlock;
-  end;
 end;
 
 procedure TCustomSynEdit.SetGutter(const Value: TSynGutter);
@@ -8913,11 +8818,7 @@ begin
   fUndoList.BeginBlock;
   try
     if SelAvail then
-    begin
-      fUndoList.AddChange(crDelete, fBlockBegin, fBlockEnd, SelText,
-        fActiveSelectionMode);
-      SetSelTextPrimitive('');
-    end;
+      SetSelText('');
     StartOfBlock := CaretXY;
 
     if i = 0 then
@@ -8974,15 +8875,8 @@ begin
     // Do not Trim
     TrimTrailingActive := eoTrimTrailingSpaces in Options;
     if TrimTrailingActive then Exclude(fOptions, eoTrimTrailingSpaces);
-    SetSelTextPrimitive(Spaces);
+    SetSelText(Spaces);
     if TrimTrailingActive then Include(fOptions, eoTrimTrailingSpaces);
-
-    // Undo is already handled in SetSelText when SelectionMode is Column
-    if fActiveSelectionMode <> smColumn then
-    begin
-      fUndoList.AddChange(crInsert, StartOfBlock, CaretXY, SelText,
-        fActiveSelectionMode);
-    end;
   finally
     fUndoList.EndBlock;
   end;
@@ -9084,11 +8978,8 @@ begin
     // Do not Trim
     TrimTrailingActive := eoTrimTrailingSpaces in Options;
     if TrimTrailingActive then Exclude(fOptions, eoTrimTrailingSpaces);
-    SetSelTextPrimitive('');
+    SetSelText('');
     if TrimTrailingActive then Include(fOptions, eoTrimTrailingSpaces);
-
-    fUndoList.AddChange(crSilentDelete, BufferCoord(NewX, CaretY),
-      OldCaretXY, OldSelText, smNormal);
 
     // KV
     ChangeScroll := not(eoScrollPastEol in fOptions);
