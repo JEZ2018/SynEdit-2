@@ -4233,6 +4233,16 @@ end;
 // DeleteSelection not to trim the string if eoScrollPastEol is not set.
 procedure TCustomSynEdit.SetSelTextPrimitiveEx(PasteMode: TSynSelectionMode;
   Value: PWideChar; AddToUndoList: Boolean);
+{
+   Works in two stages:
+     -  First deletes selection taking into account ActiveSelectionMode.
+     -  Second inserts text taking into account PasteMode.
+     -  Note: AddToUndoList only adds Insertion changes to the Undo List and only
+        when PastMode is smColumn
+    TODO: If AddUndoChanges is on add undo actions for all deletions and insertions
+          This would simplify code witch uses SetSelTextPrimitive and
+          SetSelTextPrimitiveEx
+}
 var
   BB, BE: TBufferCoord;
   TempString: string;
@@ -7358,8 +7368,8 @@ begin
           end;
           Temp := LineText;
           Temp2 := Temp;
-// This is sloppy, but the Right Thing would be to track the column of markers
-// too, so they could be moved depending on whether they are after the caret...
+          // This is sloppy, but the Right Thing would be to track the column of markers
+          // too, so they could be moved depending on whether they are after the caret...
           InsDelta := Ord(CaretX = 1);
           Len := Length(Temp);
           if Len > 0 then
@@ -7540,7 +7550,7 @@ begin
                 end;
               end
               else begin
-// Processing of case character covers on LeadByte.
+              // Processing of case character covers on LeadByte.
                 counter := 1;
                 Helper := Copy(Temp, CaretX, counter);
                 Temp[CaretX] := AChar;
@@ -7842,7 +7852,8 @@ begin
     CX := Min(CX, Length(Line) + 1);
 
     if CX > 1 then
-    begin  // only find previous char, if not already on start of line
+    begin
+      // only find previous char, if not already on start of line
       // if previous char isn't a word-break-char search for the last IdentChar
       if not IsWordBreakChar(Line[CX - 1]) then
         CX := StrRScanForCharInCategory(Line, CX - 1, IsWordBreakChar) + 1;
