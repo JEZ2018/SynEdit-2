@@ -4502,15 +4502,10 @@ var
       StatusChanged([scCaretX]);
     end;
 
-  var
-    StartLine: Integer;
-    StartCol: Integer;
   begin
     if Value = '' then
       Exit;
 
-    StartLine := CaretY;
-    StartCol := CaretX;
     case PasteMode of
       smNormal:
         InsertNormal;
@@ -4524,23 +4519,31 @@ var
   end;
 
 begin
-  IncPaintLock;
   Lines.BeginUpdate;
+  IncPaintLock;
   try
     BB := BlockBegin;
     BE := BlockEnd;
     if SelAvail then
     begin
+//      if AddToUndoList and Length(Value) = 0 then
+//      begin
+//        if (BB.Line < BE.Line) or ((BB.Line = BE.Line) and (BB.Char < BE.Char)) then
+//          fUndoList.AddChange(crDelete, BB, BE, SelText, fActiveSelectionMode)
+//        else
+//          fUndoList.AddChange(crDeleteAfterCursor, BB, BE, SelText, fActiveSelectionMode);
+//      end;
       DeleteSelection;
       InternalCaretXY := BB;
     end;
+    // if Length(Vaule) > 0 then
     if (Value <> nil) and (Value[0] <> #0) then
       InsertText;
     if CaretY < 1 then
       InternalCaretY := 1;
   finally
-    Lines.EndUpdate;
     DecPaintLock;
+    Lines.EndUpdate;
   end;
 end;
 
@@ -5648,17 +5651,6 @@ begin
               Item.ChangeEndPos);
           end;
         end;
-      crDeleteAfterCursor, crSilentDeleteAfterCursor:
-        begin
-          SetCaretAndSelection(Item.ChangeStartPos, Item.ChangeStartPos,
-            Item.ChangeEndPos);
-          TempString := SelText;
-          SetSelTextPrimitiveEx(Item.ChangeSelMode, PWideChar(Item.ChangeStr),
-            False);
-          fUndoList.AddChange(Item.ChangeReason, Item.ChangeStartPos,
-            Item.ChangeEndPos, TempString, Item.ChangeSelMode);
-          InternalCaretXY := Item.ChangeEndPos;
-        end;
       crDelete, crSilentDelete:
         begin
           SetCaretAndSelection(Item.ChangeStartPos, Item.ChangeStartPos,
@@ -6050,9 +6042,7 @@ begin
             Item.ChangeEndPos, TmpStr, Item.ChangeSelMode);
           InternalCaretXY := Item.ChangeStartPos;
         end;
-      crDeleteAfterCursor, crDelete,
-      crSilentDelete, crSilentDeleteAfterCursor,
-      crDeleteAll:
+      crDelete, crSilentDelete, crDeleteAll:
         begin
           // If there's no selection, we have to set
           // the Caret's position manualy.
@@ -6063,8 +6053,7 @@ begin
           else
             TmpPos := TBufferCoord(MinPoint(
               TPoint(Item.ChangeStartPos), TPoint(Item.ChangeEndPos)));
-          if (Item.ChangeReason in [crDeleteAfterCursor,
-            crSilentDeleteAfterCursor]) and (TmpPos.Line > Lines.Count) then
+          if TmpPos.Line > Lines.Count then // not sure this could ever occur
           begin
             InternalCaretXY := BufferCoord(1, Lines.Count);
             fLines.Add('');
@@ -6072,14 +6061,8 @@ begin
           CaretXY := TmpPos;
           SetSelTextPrimitiveEx(Item.ChangeSelMode, PWideChar(Item.ChangeStr),
             False );
-          if Item.ChangeReason in [crDeleteAfterCursor,
-            crSilentDeleteAfterCursor]
-          then
-            TmpPos := Item.ChangeStartPos
-          else
-            TmpPos := Item.ChangeEndPos;
-          if Item.ChangeReason in [crSilentDelete, crSilentDeleteAfterCursor]
-          then
+          TmpPos := Item.ChangeEndPos;
+          if Item.ChangeReason = crSilentDelete then
             InternalCaretXY := TmpPos
           else begin
             SetCaretAndSelection(TmpPos, Item.ChangeStartPos,
@@ -6915,25 +6898,10 @@ procedure TCustomSynEdit.ExecuteCommand(Command: TSynEditorCommand; AChar: WideC
   Data: pointer);
 
   procedure SetSelectedTextEmpty;
-  var
-    vSelText: string;
-    vUndoBegin, vUndoEnd: TBufferCoord;
   begin
-    vUndoBegin := fBlockBegin;
-    vUndoEnd := fBlockEnd;
-    vSelText := SelText;
+    fUndoList.AddChange(crDelete, fBlockBegin, fBlockEnd, SelText,
+      fActiveSelectionMode);
     SetSelTextPrimitive('');
-    if (vUndoBegin.Line < vUndoEnd.Line) or (
-      (vUndoBegin.Line = vUndoEnd.Line) and (vUndoBegin.Char < vUndoEnd.Char)) then
-    begin
-      fUndoList.AddChange(crDelete, vUndoBegin, vUndoEnd, vSelText,
-        fActiveSelectionMode);
-    end
-    else
-    begin
-      fUndoList.AddChange(crDeleteAfterCursor, vUndoBegin, vUndoEnd, vSelText,
-        fActiveSelectionMode);
-    end;
   end;
 
   procedure ForceCaretX(aCaretX: integer);
@@ -7258,7 +7226,7 @@ begin
             end;
             if (Caret.Char <> CaretX) or (Caret.Line <> CaretY) then
             begin
-              fUndoList.AddChange(crSilentDeleteAfterCursor, CaretXY, Caret,
+              fUndoList.AddChange(crSilentDelete, Caret, CaretXY,
                 Helper, smNormal);
             end;
           end;
@@ -7283,12 +7251,6 @@ begin
               else if Temp[WP.Char] <> #32 then
                 Inc(WP.Char);
             end;
-            {$IFOPT R+}
-            Temp := Temp + #0;
-            {$ENDIF}
-            if Temp <> '' then
-              while Temp[WP.Char] = #32 do
-                Inc(WP.Char);
           end
           else begin
             WP.Char := Len + 1;
@@ -7301,8 +7263,7 @@ begin
             ActiveSelectionMode := smNormal;
             Helper := SelText;
             SetSelTextPrimitive(UnicodeStringOfChar(' ', CaretX - BlockBegin.Char));
-            fUndoList.AddChange(crSilentDeleteAfterCursor, CaretXY, WP,
-              Helper, smNormal);
+            fUndoList.AddChange(crSilentDelete, WP, CaretXY, Helper, smNormal);
             InternalCaretXY := CaretXY;
           end;
         end;
@@ -7337,14 +7298,15 @@ begin
           if CaretY = Lines.Count then
           begin
             Lines[CaretY - 1] := '';
-            fUndoList.AddChange(crSilentDeleteAfterCursor, BufferCoord(1, CaretY),
-              BufferCoord(Length(Helper) + 1, CaretY), Helper, smNormal);
+            fUndoList.AddChange(crSilentDelete,
+              BufferCoord(Length(Helper) + 1, CaretY), BufferCoord(1, CaretY),
+              Helper, smNormal);
           end
           else begin
             Lines.Delete(CaretY - 1);
             Helper := Helper + #13#10;
-            fUndoList.AddChange(crSilentDeleteAfterCursor, BufferCoord(1, CaretY),
-              BufferCoord(1, CaretY + 1), Helper, smNormal);
+            fUndoList.AddChange(crSilentDelete, BufferCoord(1, CaretY + 1),
+              BufferCoord(1, CaretY), Helper, smNormal);
           end;
           InternalCaretXY := BufferCoord(1, CaretY); // like seen in the Delphi editor
         end;
