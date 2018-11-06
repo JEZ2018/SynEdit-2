@@ -5711,6 +5711,9 @@ begin
            fUndoList.AddChange(Item.ChangeReason, Item.ChangeStartPos,
              Item.ChangeEndPos, Item.ChangeStr, Item.ChangeSelMode);
          end;
+      crNothing, crPasteBegin, crPasteEnd:
+        fUndoList.AddChange(Item.ChangeReason, Item.ChangeStartPos,
+           Item.ChangeEndPos, Item.ChangeStr, Item.ChangeSelMode);
     end;
   finally
     ActiveSelectionMode := OldSelectionMode;
@@ -6111,6 +6114,9 @@ begin
           SetSelTextPrimitiveEx(Item.ChangeSelMode, PWideChar(Item.ChangeStr), True);
           InternalCaretXY := Item.ChangeStartPos;
         end;
+      crNothing, crPasteBegin, crPasteEnd:
+        fRedoList.AddChange(Item.ChangeReason, Item.ChangeStartPos,
+           Item.ChangeEndPos, Item.ChangeStr, Item.ChangeSelMode);
     end;
   finally
     if ChangeScrollPastEol then

@@ -181,7 +181,7 @@ type
     crSpecial2Begin, crSpecial2End,
     crCaret,      // just restore the Caret, allowing better Undo behavior
     crSelection,  // restore Selection
-    crNothing,
+    crNothing,    // can be used to break group undo
     crGroupBreak,
     crDeleteAll,
     crWhiteSpaceAdd // for undo/redo of adding a character past EOL and repositioning the caret
