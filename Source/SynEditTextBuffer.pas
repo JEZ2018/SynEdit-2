@@ -173,9 +173,8 @@ type
   TSynChangeReason = (crInsert, crPaste, crDragDropInsert,
     // Note: several undo entries can be chained together via the ChangeNumber
     // see also TCustomSynEdit.[Begin|End]UndoBlock methods
-    crDeleteAfterCursor, crDelete,
+    crDelete, crSilentDelete,
     crLineBreak, crIndent, crUnindent,
-    crSilentDelete, crSilentDeleteAfterCursor,
     crAutoCompleteBegin, crAutoCompleteEnd,
     crPasteBegin, crPasteEnd, // for pasting, since it might do a lot of operations
     crSpecial1Begin, crSpecial1End,
