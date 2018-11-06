@@ -185,8 +185,6 @@ const
   ecTab             = 612;  // Tab key
   ecShiftTab        = 613;  // Shift+Tab key
 
-  ecAutoCompletion  = 650;
-
   ecUpperCase       = 620; // apply to the current or previous word
   ecLowerCase       = 621;
   ecToggleCase      = 622;
@@ -196,6 +194,13 @@ const
   ecToggleCaseBlock = 627;
 
   ecString          = 630;  //Insert a whole string
+
+  ecAutoCompletion  = 650;
+
+  ecCopyLineUp      = 661;
+  ecCopyLineDown    = 662;
+  //ecMoveLineUp      = 663;
+  //ecMoveLineDown    = 664;
 
   //++ CodeFolding
   ecFoldAll         = 701;
@@ -309,7 +314,7 @@ uses
 
 const
 //++ CodeFolding
-  EditorCommandStrs: array[0..112] of TIdentMapEntry = (
+  EditorCommandStrs: array[0..114] of TIdentMapEntry = (
 //-- CodeFolding
     (Value: ecNone; Name: 'ecNone'),
     (Value: ecLeft; Name: 'ecLeft'),
@@ -411,6 +416,10 @@ const
     (Value: ecUpperCaseBlock; Name: 'ecUpperCaseBlock'),
     (Value: ecLowerCaseBlock; Name: 'ecLowerCaseBlock'),
     (Value: ecToggleCaseBlock; Name: 'ecToggleCaseBlock'),
+    (Value: ecCopyLineUp; Name:'ecCopyLineUp'),
+    (Value: ecCopyLineDown; Name:'ecCopyLineDown'),
+//    (Value: ecMoveLineUp; Name:'ecMoveLineUp'),
+//    (Value: ecMoveLineDown; Name:'ecMoveLineDown'),
 //++ CodeFolding
     (Value: ecString; Name:'ecString'),
     (Value: ecFoldAll; Name:'ecFoldAll'),
@@ -827,6 +836,10 @@ begin
   AddKey(ecColumnSelect, ord('C'), [ssCtrl,ssShift]);
   AddKey(ecLineSelect, ord('L'), [ssCtrl,ssShift]);
   AddKey(ecMatchBracket, ord('B'), [ssCtrl,ssShift]);
+  AddKey(ecCopyLineUp, SYNEDIT_UP, [ssShift, ssAlt]);
+  AddKey(ecCopyLineDown, SYNEDIT_DOWN, [ssShift, ssAlt]);
+  //AddKey(ecMoveLineUp, SYNEDIT_UP, [ssAlt]);
+  //AddKey(ecMoveLineDown, SYNEDIT_DOWN, [ssAlt]);
 //++ CodeFolding
   AddKey(ecFoldAll, VK_OEM_MINUS, [ssCtrl, ssShift]);   {- _}
   AddKey(ecUnfoldAll,  VK_OEM_PLUS, [ssCtrl, ssShift]); {= +}
