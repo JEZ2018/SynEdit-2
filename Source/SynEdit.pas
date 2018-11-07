@@ -840,6 +840,9 @@ type
     procedure CollapseFoldType(FoldType : Integer);
     procedure UnCollapseFoldType(FoldType : Integer);
 //-- CodeFolding
+//++ CopyLine Up/Down
+    procedure CopyLinesUpDown(Up: Boolean);
+//-- CopyLine Up/Down
   public
     property AdditionalIdentChars: TSysCharSet read FAdditionalIdentChars write SetAdditionalIdentChars;
     property AdditionalWordBreakChars: TSysCharSet read FAdditionalWordBreakChars write SetAdditionalWordBreakChars;
@@ -1252,6 +1255,112 @@ begin
     // when it is done with it.
   finally
     Clipboard.Close;
+  end;
+end;
+
+procedure TCustomSynEdit.CopyLinesUpDown(Up: Boolean);
+var
+  Caret, CaretNew: TBufferCoord;
+  S, Pred, Prefix, Suffix, TextToSel: string;
+  IsSelectionExists: Boolean;
+  SelStartOld, SelEndOld, LinesDelta, LineIndex: Integer;
+  BlockStart, BlockEnd: TBufferCoord;
+  LinesToCopy: TStrings;
+
+  function CountOccurences(const SubText: string; const Text: string): Integer;
+  var
+    Offset: integer;
+  begin
+    Result := 0;
+    Offset := PosEx(SubText, Text, 1);
+    while Offset <> 0 do
+    begin
+      Inc(Result);
+      Offset := PosEx(SubText, Text, Offset + Length(SubText));
+    end;
+  end;
+
+begin
+  Caret := CaretXY;
+  IsSelectionExists := SelText <> '';
+  if IsSelectionExists then begin
+    SelStartOld := SelStart;
+    SelEndOld := SelEnd;
+    BlockStart := CharIndexToRowCol(SelStart);
+    BlockEnd := CharIndexToRowCol(SelEnd);
+    LinesDelta := BlockEnd.Line - BlockStart.Line + 1;
+    LinesToCopy := TStringList.Create;
+    try
+      for LineIndex := BlockStart.Line-1 to BlockEnd.Line-2 do begin
+        if LineIndex >= 0 then begin
+          LinesToCopy.Add(Lines[LineIndex]);
+        end;
+      end;
+      if BlockEnd.Char > 1 then
+        LinesToCopy.Add(Lines[BlockEnd.Line-1]);
+      for LineIndex := 0 to LinesToCopy.Count-2 do
+        S := S + LinesToCopy[LineIndex] + #13#10;
+      S := S + LinesToCopy[LinesToCopy.Count-1]
+    finally
+      LinesToCopy.Free
+    end;
+    if Up then begin
+      if BlockStart.Line > 1 then begin
+        Pred := Lines[BlockStart.Line-2];
+        Prefix := #13#10;
+        Suffix := '';
+      end
+      else begin
+        Pred := '';
+        Prefix := '';
+        Suffix := #13#10;
+      end;
+      CaretNew := BufferCoord(Length(Pred)+1, Caret.Line-LinesDelta);
+    end
+    else begin
+       CaretNew := BufferCoord(Length(S)+1, Caret.Line-LinesDelta);
+    end;
+    Prefix := #13#10;
+    Suffix := '';
+  end
+  else begin
+    LinesDelta := 1;
+    S := Lines[Caret.Line -1];
+    if Up then begin
+      if Caret.Line > 1 then begin
+        Pred := Lines[Caret.Line-2];
+        Prefix := #13#10;
+        Suffix := '';
+      end
+      else begin
+        Pred := '';
+        Prefix := '';
+        Suffix := #13#10;
+      end;
+      CaretNew := BufferCoord(Length(Pred)+1, Caret.Line-LinesDelta);
+    end
+    else begin
+      CaretNew := BufferCoord(Length(S)+1, Caret.Line);
+      Prefix := #13#10;
+      Suffix := '';
+    end;
+  end;
+  TextToSel := Prefix + S + Suffix;
+  ActiveSelectionMode := smNormal;
+  BeginUndoBlock;
+  try
+    fUndoList.AddChange(crCaret, Caret, Caret, '', fActiveSelectionMode);
+    SetCaretAndSelection(CaretNew, CaretNew, CaretNew);
+    SetSelText(TextToSel);
+    CaretNew.Char := Caret.Char;
+    Inc(CaretNew.Line, LinesDelta);
+    SetCaretAndSelection(CaretNew, CaretNew, CaretNew);
+    if IsSelectionExists then begin
+      SetSelStart(SelStartOld);
+      SetSelEnd(SelEndOld);
+    end;
+  finally
+    EndUndoBlock;
   end;
 end;
 
@@ -7646,11 +7755,10 @@ begin
 //-- CodeFolding
 //++ CopyLine Up/Down
       ecCopyLineUp: begin
-        Lines.Insert(CaretY, LineText);
+        CopyLinesUpDown(True);
       end;
       ecCopyLineDown: begin
-        Lines.Insert(CaretY, LineText);
-        MoveCaretVert(1, False);
+        CopyLinesUpDown(False);
       end;
 //-- CopyLine Up/Down
 //++ MoveLine Up/Down
