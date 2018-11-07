@@ -7642,6 +7642,14 @@ begin
           // Get Caret and selection
           Caret := CaretXY;
           StartOfBlock := fBlockBegin;
+          if (fBlockEnd.Line > fBlockBegin.Line) and (fBlockEnd.Char < 2) then begin
+            // store pred line
+            S := Lines[fBlockEnd.Line-2];
+            // align selection to length of pred line
+            fBlockEnd.Char := Length(S)+1;
+            Dec(fBlockEnd.Line);
+          end;
+
           EndOfBlock := fBlockEnd;
           // No of Lines
           Counter := Abs(fBlockEnd.Line - fBlockBegin.Line);
