@@ -185,8 +185,6 @@ const
   ecTab             = 612;  // Tab key
   ecShiftTab        = 613;  // Shift+Tab key
 
-  ecAutoCompletion  = 650;
-
   ecUpperCase       = 620; // apply to the current or previous word
   ecLowerCase       = 621;
   ecToggleCase      = 622;
@@ -196,6 +194,13 @@ const
   ecToggleCaseBlock = 627;
 
   ecString          = 630;  //Insert a whole string
+
+  ecAutoCompletion  = 650;
+
+  ecCopyLineUp      = 661;
+  ecCopyLineDown    = 662;
+  //ecMoveLineUp      = 663;
+  //ecMoveLineDown    = 664;
 
   //++ CodeFolding
   ecFoldAll         = 701;
@@ -211,15 +216,6 @@ const
   ecFoldRegions      = 731;
   ecUnfoldRegions    = 732;
   //-- CodeFolding
-
-  //++ CopyLine Up/Down
-  ecCopyLineUp    = 733;
-  ecCopyLineDown  = 734;
-  //-- CopyLine Up/Down
-  //++ MoveLine Up/Down
-  ecMoveLineUp    = 735;
-  ecMoveLineDown  = 736;
-  //-- MoveLine Up/Down
 
   ecUserFirst       = 1001; // Start of user-defined commands
 
@@ -318,7 +314,7 @@ uses
 
 const
 //++ CodeFolding
-  EditorCommandStrs: array[0..116] of TIdentMapEntry = (
+  EditorCommandStrs: array[0..114] of TIdentMapEntry = (
 //-- CodeFolding
     (Value: ecNone; Name: 'ecNone'),
     (Value: ecLeft; Name: 'ecLeft'),
@@ -420,6 +416,10 @@ const
     (Value: ecUpperCaseBlock; Name: 'ecUpperCaseBlock'),
     (Value: ecLowerCaseBlock; Name: 'ecLowerCaseBlock'),
     (Value: ecToggleCaseBlock; Name: 'ecToggleCaseBlock'),
+    (Value: ecCopyLineUp; Name:'ecCopyLineUp'),
+    (Value: ecCopyLineDown; Name:'ecCopyLineDown'),
+//    (Value: ecMoveLineUp; Name:'ecMoveLineUp'),
+//    (Value: ecMoveLineDown; Name:'ecMoveLineDown'),
 //++ CodeFolding
     (Value: ecString; Name:'ecString'),
     (Value: ecFoldAll; Name:'ecFoldAll'),
@@ -433,17 +433,8 @@ const
     (Value: ecUnfoldLevel2; Name:'ecUnfoldLevel2'),
     (Value: ecUnfoldLevel3; Name:'ecUnfoldLevel3'),
     (Value: ecFoldRegions; Name:'ecFoldRanges'),
-    (Value: ecUnfoldRegions; Name:'ecUnfoldRanges'),
+    (Value: ecUnfoldRegions; Name:'ecUnfoldRanges'));
 //-- CodeFolding
-//++ CopyLine Up/Down
-    (Value: ecCopyLineUp; Name:'ecCopyLineUp'),
-    (Value: ecCopyLineDown; Name:'ecCopyLineDown'),
-//-- CopyLine Up/Down
-//++ MoveLine Up/Down
-    (Value: ecMoveLineUp; Name:'ecMoveLineUp'),
-    (Value: ecMoveLineDown; Name:'ecMoveLineDown'));
-//-- MoveLine Up/Down
-
 procedure GetEditorCommandValues(Proc: TGetStrProc);
 var
   i: integer;
@@ -845,6 +836,10 @@ begin
   AddKey(ecColumnSelect, ord('C'), [ssCtrl,ssShift]);
   AddKey(ecLineSelect, ord('L'), [ssCtrl,ssShift]);
   AddKey(ecMatchBracket, ord('B'), [ssCtrl,ssShift]);
+  AddKey(ecCopyLineUp, SYNEDIT_UP, [ssShift, ssAlt]);
+  AddKey(ecCopyLineDown, SYNEDIT_DOWN, [ssShift, ssAlt]);
+  //AddKey(ecMoveLineUp, SYNEDIT_UP, [ssAlt]);
+  //AddKey(ecMoveLineDown, SYNEDIT_DOWN, [ssAlt]);
 //++ CodeFolding
   AddKey(ecFoldAll, VK_OEM_MINUS, [ssCtrl, ssShift]);   {- _}
   AddKey(ecUnfoldAll,  VK_OEM_PLUS, [ssCtrl, ssShift]); {= +}
@@ -857,14 +852,6 @@ begin
   AddKey(ecUnfoldLevel2, ord('K'), [ssCtrl, ssShift], Ord('2'), [ssCtrl, ssShift]);
   AddKey(ecUnfoldLevel3, ord('K'), [ssCtrl, ssShift], Ord('3'), [ssCtrl, ssShift]);
 //-- CodeFolding
-//++ CopyLine Up/Down
-  AddKey(ecCopyLineUp, SYNEDIT_UP, [ssShift, ssAlt]);
-  AddKey(ecCopyLineDown, SYNEDIT_DOWN, [ssShift, ssAlt]);
-//-- CopyLine Up/Down
-//++ MoveLine Up/Down
-  AddKey(ecMoveLineUp, SYNEDIT_UP, [ssAlt]);
-  AddKey(ecMoveLineDown, SYNEDIT_DOWN, [ssAlt]);
-//-- MoveLine Up/Down
 end;
 
 procedure TSynEditKeyStrokes.SetItem(Index: Integer; Value: TSynEditKeyStroke);
