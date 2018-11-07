@@ -7656,11 +7656,17 @@ begin
           // store the lines
           S  := '';
           for vCaretRow := BlockBegin.Line to BlockEnd.Line do
+          begin
+            if (vCaretRow = BlockEnd.Line) and (BlockEnd.Char=1) then
+            begin
+              Dec(Counter);
+              break;
+            end;
             if Command = ecCopyLineDown then
               S := S + SLineBreak + Lines[vCaretRow -1]
             else
               S := S + Lines[vCaretRow -1] + SLineBreak;
-
+          end;
           // Deal with Selection modes
           OldSelectionMode := ActiveSelectionMode;
           ActiveSelectionMode := smNormal;
@@ -7675,8 +7681,12 @@ begin
             //CaretNew is set to the insertion point
             if Command = ecCopyLineUp then
               CaretNew := BufferCoord(1, BlockBegin.Line)
-            else
-              CaretNew := BufferCoord(Succ(Length(Lines[BlockEnd.Line-1])), BlockEnd.Line);
+            else begin
+              if (BlockBegin.Line < BlockEnd.Line) and (BlockEnd.Char = 1) then
+                CaretNew := BufferCoord(Succ(Length(Lines[BlockEnd.Line-2])), BlockEnd.Line-1)
+              else
+                CaretNew := BufferCoord(Succ(Length(Lines[BlockEnd.Line-1])), BlockEnd.Line);
+            end;
 
             SetCaretAndSelection(CaretNew, CaretNew, CaretNew);
             // Adds a copy of the lines below or above
