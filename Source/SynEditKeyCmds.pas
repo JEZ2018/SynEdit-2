@@ -199,8 +199,8 @@ const
 
   ecCopyLineUp      = 661;
   ecCopyLineDown    = 662;
-  //ecMoveLineUp      = 663;
-  //ecMoveLineDown    = 664;
+  ecMoveLineUp      = 663;
+  ecMoveLineDown    = 664;
 
   //++ CodeFolding
   ecFoldAll         = 701;
@@ -314,7 +314,7 @@ uses
 
 const
 //++ CodeFolding
-  EditorCommandStrs: array[0..114] of TIdentMapEntry = (
+  EditorCommandStrs: array[0..116] of TIdentMapEntry = (
 //-- CodeFolding
     (Value: ecNone; Name: 'ecNone'),
     (Value: ecLeft; Name: 'ecLeft'),
@@ -418,8 +418,8 @@ const
     (Value: ecToggleCaseBlock; Name: 'ecToggleCaseBlock'),
     (Value: ecCopyLineUp; Name:'ecCopyLineUp'),
     (Value: ecCopyLineDown; Name:'ecCopyLineDown'),
-//    (Value: ecMoveLineUp; Name:'ecMoveLineUp'),
-//    (Value: ecMoveLineDown; Name:'ecMoveLineDown'),
+    (Value: ecMoveLineUp; Name:'ecMoveLineUp'),
+    (Value: ecMoveLineDown; Name:'ecMoveLineDown'),
 //++ CodeFolding
     (Value: ecString; Name:'ecString'),
     (Value: ecFoldAll; Name:'ecFoldAll'),
@@ -838,8 +838,8 @@ begin
   AddKey(ecMatchBracket, ord('B'), [ssCtrl,ssShift]);
   AddKey(ecCopyLineUp, SYNEDIT_UP, [ssShift, ssAlt]);
   AddKey(ecCopyLineDown, SYNEDIT_DOWN, [ssShift, ssAlt]);
-  //AddKey(ecMoveLineUp, SYNEDIT_UP, [ssAlt]);
-  //AddKey(ecMoveLineDown, SYNEDIT_DOWN, [ssAlt]);
+  AddKey(ecMoveLineUp, SYNEDIT_UP, [ssAlt]);
+  AddKey(ecMoveLineDown, SYNEDIT_DOWN, [ssAlt]);
 //++ CodeFolding
   AddKey(ecFoldAll, VK_OEM_MINUS, [ssCtrl, ssShift]);   {- _}
   AddKey(ecUnfoldAll,  VK_OEM_PLUS, [ssCtrl, ssShift]); {= +}

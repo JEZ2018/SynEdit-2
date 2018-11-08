@@ -7713,6 +7713,10 @@ begin
           // Restore Selection mods
           ActiveSelectionMode := OldSelectionMode;
         end;
+      ecMoveLineUp, ecMoveLineDown:
+        begin
+          // TODO
+        end;
 //++ CodeFolding
       ecFoldAll: begin CollapseAll; end;
       ecUnfoldAll: begin UncollapseAll; end;
