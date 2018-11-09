@@ -5613,6 +5613,7 @@ begin
   if Assigned(Item) then
   try
     ActiveSelectionMode := Item.ChangeSelMode;
+    DoOnPaintTransientEx(ttBefore,true);
     IncPaintLock;
     Include(fOptions, eoScrollPastEol);
     fUndoList.InsideRedo := True;
@@ -5722,7 +5723,8 @@ begin
       Exclude(fOptions, eoScrollPastEol);
     Item.Free;
     DecPaintLock;
-  end;
+    DoOnPaintTransientEx(ttAfter,true);
+ end;
 end;
 
 //++ CodeFolding
@@ -6003,6 +6005,7 @@ begin
   if Assigned(Item) then
   try
     ActiveSelectionMode := Item.ChangeSelMode;
+    DoOnPaintTransientEx(ttBefore,true);
     IncPaintLock;
     Include(fOptions, eoScrollPastEol);
     case Item.ChangeReason of
@@ -6123,7 +6126,8 @@ begin
       Exclude(fOptions, eoScrollPastEol);
     Item.Free;
     DecPaintLock;
-  end;
+    DoOnPaintTransientEx(ttAfter,true);
+ end;
 end;
 
 procedure TCustomSynEdit.ClearBookMark(BookMark: Integer);
@@ -7638,7 +7642,7 @@ begin
           end;
         end;
       ecCopyLineUp, ecCopyLineDown:
-        begin
+        if not ReadOnly then begin
           // Get Caret and selection
           Caret := CaretXY;
           StartOfBlock := fBlockBegin;
@@ -7649,7 +7653,9 @@ begin
           S  := '';
           for vCaretRow := BlockBegin.Line to BlockEnd.Line do
           begin
-            if (vCaretRow = BlockEnd.Line) and (BlockEnd.Char=1) then
+            if (vCaretRow = BlockEnd.Line) and
+              (fBlockBegin.Line <> fBlockEnd.Line) and (BlockEnd.Char=1)
+            then
             begin
               Dec(Counter);
               break;
@@ -7663,7 +7669,8 @@ begin
           OldSelectionMode := ActiveSelectionMode;
           ActiveSelectionMode := smNormal;
 
-          // group actions for undo redo
+          // group actions for undo redo and reduce transient painting
+          DoOnPaintTransientEx(ttBefore,true);
           BeginUndoBlock;
           try
             // Save caret and selection, so that they can be restored by undo
@@ -7674,7 +7681,7 @@ begin
             if Command = ecCopyLineUp then
               CaretNew := BufferCoord(1, BlockBegin.Line)
             else begin
-              if (BlockBegin.Line < BlockEnd.Line) and (BlockEnd.Char = 1) then
+              if (fBlockBegin.Line <> fBlockEnd.Line) and (BlockEnd.Char = 1) then
                 CaretNew := BufferCoord(Succ(Length(Lines[BlockEnd.Line-2])), BlockEnd.Line-1)
               else
                 CaretNew := BufferCoord(Succ(Length(Lines[BlockEnd.Line-1])), BlockEnd.Line);
@@ -7700,6 +7707,7 @@ begin
             fUndoList.AddChange(crNothing, Caret, Caret, '', fActiveSelectionMode);
           finally
             EndUndoBlock;
+            DoOnPaintTransientEx(ttAfter,true);
           end;
 
           // Restore Selection mods
