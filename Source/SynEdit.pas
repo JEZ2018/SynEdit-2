@@ -7657,7 +7657,8 @@ begin
           S  := '';
           for vCaretRow := BlockBegin.Line to BlockEnd.Line do
           begin
-            if (vCaretRow = BlockEnd.Line) and (BlockEnd.Char=1) then
+            if (vCaretRow = BlockEnd.Line) and (BlockEnd.Char=1) and
+              (BlockEnd.Line <> BlockBegin.Line) then
             begin
               Dec(Counter);
               break;
@@ -7713,9 +7714,74 @@ begin
           // Restore Selection mods
           ActiveSelectionMode := OldSelectionMode;
         end;
-      ecMoveLineUp, ecMoveLineDown:
+      {ecMoveLineUp, }ecMoveLineDown:
         begin
-          // TODO
+          // check out of the lines ranges
+          if (Command = ecMoveLineDown) and
+            (Max(fBlockEnd.Line, fBlockBegin.Line) >= Lines.Count) then
+              Exit;
+          if (Command = ecMoveLineUp) and
+            (Max(fBlockEnd.Line, fBlockBegin.Line) < 2) then
+              Exit;
+          // Get Caret and selection
+          Caret := CaretXY;
+          StartOfBlock := fBlockBegin;
+          EndOfBlock := fBlockEnd;
+          S  := '';
+          for vCaretRow := BlockBegin.Line to BlockEnd.Line do
+          begin
+            if (vCaretRow = BlockEnd.Line) and (BlockEnd.Char=1) and
+              (BlockEnd.Line <> BlockBegin.Line) then
+            begin
+              Dec(Counter);
+              break;
+            end;
+            if Command = ecMoveLineDown then
+              S := S + SLineBreak + Lines[vCaretRow -1]
+            else
+              S := S + Lines[vCaretRow -1] + SLineBreak;
+          end;
+          S := Lines[EndOfBlock.Line]+ S;
+
+          // Deal with Selection modes
+          OldSelectionMode := ActiveSelectionMode;
+          ActiveSelectionMode := smNormal;
+
+          BeginUndoBlock;
+          try
+            // Save caret and selection, so that they can be restored by undo
+            fUndoList.AddChange(crCaret, Caret, Caret, '', OldSelectionMode);
+            fUndoList.AddChange(crSelection, fBlockBegin, fBlockEnd, '', OldSelectionMode);
+
+            //CaretNew is set to the insertion point
+            CaretNew := BufferCoord(1, BlockBegin.Line);
+            SetCaretAndSelection(
+              CaretNew,
+              BufferCoord(1, StartOfBlock.Line),
+              BufferCoord(Length(Lines[EndOfBlock.Line])+1, EndOfBlock.Line+1)
+            );
+            // Adds a copy of the lines below or above
+            SetSelText(S);
+
+            Inc(Caret.Line);
+            Inc(StartOfBlock.Line);
+            Inc(EndOfBlock.Line);
+            SetCaretAndSelection(Caret, StartOfBlock, EndOfBlock);
+
+            // Save caret and selection, so that they can be restored by redo
+            fUndoList.AddChange(crSelection, fBlockBegin, fBlockEnd, '', OldSelectionMode);
+            fUndoList.AddChange(crCaret, Caret, Caret, '', OldSelectionMode);
+
+            // this does nothing but prevents undoing a subsequent Move Line down
+            // to be merged with this one
+            fUndoList.AddChange(crNothing, Caret, Caret, '', fActiveSelectionMode);
+          finally
+            EndUndoBlock;
+          end;
+
+          // Restore Selection mods
+          ActiveSelectionMode := OldSelectionMode;
+
         end;
 //++ CodeFolding
       ecFoldAll: begin CollapseAll; end;
