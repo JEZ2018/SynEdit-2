@@ -7714,7 +7714,7 @@ begin
           // Restore Selection mods
           ActiveSelectionMode := OldSelectionMode;
         end;
-      {ecMoveLineUp, }ecMoveLineDown:
+      ecMoveLineUp, ecMoveLineDown:
         begin
           // check out of the lines ranges
           if (Command = ecMoveLineDown) and
@@ -7744,8 +7744,11 @@ begin
             else
               S := S + Lines[vCaretRow -1] + SLineBreak;
           end;
-          S := Lines[EndOfBlock.Line]+ S;
-
+          if Command = ecMoveLineDown then
+            S := Lines[BlockEnd.Line]+ S
+          else
+            S := S + Lines[BlockBegin.Line-2];
+          OutputDebugString(PChar(S));
           // Deal with Selection modes
           OldSelectionMode := ActiveSelectionMode;
           ActiveSelectionMode := smNormal;
@@ -7755,20 +7758,35 @@ begin
             // Save caret and selection, so that they can be restored by undo
             fUndoList.AddChange(crCaret, Caret, Caret, '', OldSelectionMode);
             fUndoList.AddChange(crSelection, fBlockBegin, fBlockEnd, '', OldSelectionMode);
-
-            //CaretNew is set to the insertion point
-            CaretNew := BufferCoord(1, BlockBegin.Line);
-            SetCaretAndSelection(
-              CaretNew,
-              BufferCoord(1, StartOfBlock.Line),
-              BufferCoord(Length(Lines[EndOfBlock.Line])+1, EndOfBlock.Line+1)
-            );
+            if Command = ecMoveLineDown then begin
+              //CaretNew is set to the insertion point
+              CaretNew := BufferCoord(1, BlockBegin.Line);
+              SetCaretAndSelection(
+                CaretNew, CaretNew,
+                BufferCoord(Length(Lines[BlockEnd.Line])+1, BlockEnd.Line+1)
+              );
+            end
+            else begin
+              //CaretNew is set to the insertion point
+              CaretNew := BufferCoord(1, BlockBegin.Line-1);
+              SetCaretAndSelection(
+                CaretNew, CaretNew,
+                BufferCoord(Length(Lines[BlockEnd.Line-1])+1, BlockEnd.Line)
+              );
+            end;
             // Adds a copy of the lines below or above
             SetSelText(S);
 
-            Inc(Caret.Line);
-            Inc(StartOfBlock.Line);
-            Inc(EndOfBlock.Line);
+            if Command = ecMoveLineDown then begin
+              Inc(Caret.Line);
+              Inc(StartOfBlock.Line);
+              Inc(EndOfBlock.Line);
+            end
+            else begin
+              Dec(Caret.Line);
+              Dec(StartOfBlock.Line);
+              Dec(EndOfBlock.Line);
+            end;
             SetCaretAndSelection(Caret, StartOfBlock, EndOfBlock);
 
             // Save caret and selection, so that they can be restored by redo
