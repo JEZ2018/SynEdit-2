@@ -7726,16 +7726,19 @@ begin
           // Get Caret and selection
           Caret := CaretXY;
           StartOfBlock := fBlockBegin;
+          if (fBlockEnd.Line > fBlockBegin.Line) and (fBlockEnd.Char < 2) then begin
+            // store pred line
+            S := Lines[fBlockEnd.Line-2];
+            // align selection to length of pred line
+            fBlockEnd.Char := Length(S)+1;
+            Dec(fBlockEnd.Line);
+          end;
           EndOfBlock := fBlockEnd;
+
+          // store the lines
           S  := '';
           for vCaretRow := BlockBegin.Line to BlockEnd.Line do
           begin
-            if (vCaretRow = BlockEnd.Line) and (BlockEnd.Char=1) and
-              (BlockEnd.Line <> BlockBegin.Line) then
-            begin
-              Dec(Counter);
-              break;
-            end;
             if Command = ecMoveLineDown then
               S := S + SLineBreak + Lines[vCaretRow -1]
             else
