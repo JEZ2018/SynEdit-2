@@ -28,8 +28,6 @@ replace them with the notice and other provisions required by the GPL.
 If you do not delete the provisions above, a recipient may use your version
 of this file under either the MPL or the GPL.
 
-$Id: SynEdit.pas,v 1.32.1 2012/19/09 10:50:00 CodehunterWorks Exp $
-
 You may retrieve the latest version of this file at the SynEdit home page,
 located at http://SynEdit.SourceForge.net
 
@@ -752,10 +750,7 @@ type
     function IsWhiteChar(AChar: WideChar): Boolean; virtual;
     function IsWordBreakChar(AChar: WideChar): Boolean; virtual;
 
-    // Codehunter patch: Make InsertBlock, DoBlockIndent, DoBlockUnindent public
     procedure InsertBlock(const BB, BE: TBufferCoord; ChangeStr: PWideChar; AddToUndoList: Boolean);
-    // Codehunter patch: Added UnifiedSelection
-    function UnifiedSelection: TBufferBlock;
     procedure DoBlockIndent;
     procedure DoBlockUnindent;
 
@@ -7267,26 +7262,42 @@ begin
           DoOnPaintTransient(ttAfter);
         end;
       ecDeleteLine:
-        if not ReadOnly and (Lines.Count > 0) and not ((CaretY = Lines.Count) and (Length(Lines[CaretY - 1]) = 0))
-        then begin
+        if not ReadOnly and (Lines.Count > 0) and
+          not ((BlockBegin.Line = Lines.Count) and
+          (Length(Lines[BlockBegin.Line - 1]) = 0)) then
+        begin
           DoOnPaintTransient(ttBefore);
-          if SelAvail then
-            SetBlockBegin(CaretXY);
-          Helper := LineText;
-          if CaretY = Lines.Count then
-          begin
-            Lines[CaretY - 1] := '';
-            fUndoList.AddChange(crSilentDelete,
-              BufferCoord(Length(Helper) + 1, CaretY), BufferCoord(1, CaretY),
-              Helper, smNormal);
-          end
-          else begin
-            Lines.Delete(CaretY - 1);
-            Helper := Helper + #13#10;
-            fUndoList.AddChange(crSilentDelete, BufferCoord(1, CaretY + 1),
-              BufferCoord(1, CaretY), Helper, smNormal);
+          // Deal with Selection modes
+          OldSelectionMode := ActiveSelectionMode;
+          ActiveSelectionMode := smNormal;
+          BeginUndoBlock;
+          try
+            // Save caret and selection, so that they can be restored by undo
+            fUndoList.AddChange(crCaret, CaretXY, CaretXY, '', OldSelectionMode);
+            fUndoList.AddChange(crSelection, fBlockBegin, fBlockEnd, '', OldSelectionMode);
+            // Nomalize selection
+            if fBlockBegin > fBlockEnd then
+              SetCaretAndSelection(BlockBegin, BlockBegin, BlockEnd);
+            fBlockBegin.Char := 1;
+            if (fBlockBegin.Line = fBlockEnd.Line) or (fBlockEnd.Char > 1) then
+            begin
+              if fBlockEnd.Line = Lines.Count then
+                fBlockEnd.Char := Length(Lines[fBlockEnd.Line-1]) + 1
+              else
+                fBlockEnd := BufferCoord(1, Succ(fBlockEnd.Line));
+            end;
+            SetSelText('');
+            SetCaretAndSelection(fBlockBegin, fBlockBegin, fBlockBegin);
+
+            // Save caret and selection, so that they can be restored by redo
+            fUndoList.AddChange(crSelection, fBlockBegin, fBlockEnd, '', OldSelectionMode);
+            fUndoList.AddChange(crCaret, fBlockBegin, fBlockBegin, '', OldSelectionMode);
+            fUndoList.AddChange(crNothing, Caret, Caret, '', fActiveSelectionMode);
+          finally
+            EndUndoBlock;
+            // Restore Selection mode
+            ActiveSelectionMode := OldSelectionMode;
           end;
-          InternalCaretXY := BufferCoord(1, CaretY); // like seen in the Delphi editor
         end;
       ecClearAll:
         begin
@@ -7710,7 +7721,7 @@ begin
             DoOnPaintTransientEx(ttAfter,true);
           end;
 
-          // Restore Selection mods
+          // Restore Selection mode
           ActiveSelectionMode := OldSelectionMode;
         end;
 //++ CodeFolding
@@ -8109,24 +8120,6 @@ procedure TCustomSynEdit.UnlockUndo;
 begin
   fUndoList.Unlock;
   fRedoList.Unlock;
-end;
-
-function TCustomSynEdit.UnifiedSelection: TBufferBlock;
-begin
-  if BlockBegin.Line > BlockEnd.Line then begin
-    result.BeginLine:= BlockEnd.Line;
-    result.EndLine:= BlockBegin.Line;
-  end else begin
-    result.BeginLine:= BlockBegin.Line;
-    result.EndLine:= BlockEnd.Line;
-  end;
-  if BlockBegin.Char > BlockEnd.Char then begin
-    result.BeginChar:= BlockEnd.Char;
-    result.EndChar:= BlockBegin.Char;
-  end else begin
-    result.BeginChar:= BlockBegin.Char;
-    result.EndChar:= BlockEnd.Char;
-  end;
 end;
 
 procedure TCustomSynEdit.WMSetCursor(var Msg: TWMSetCursor);
