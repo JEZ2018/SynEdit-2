@@ -7761,7 +7761,8 @@ begin
           // Deal with Selection modes
           OldSelectionMode := ActiveSelectionMode;
           ActiveSelectionMode := smNormal;
-
+          // group actions for undo redo and reduce transient painting
+          DoOnPaintTransientEx(ttBefore,true);
           BeginUndoBlock;
           try
             // Save caret and selection, so that they can be restored by undo
@@ -7807,11 +7808,10 @@ begin
             fUndoList.AddChange(crNothing, Caret, Caret, '', fActiveSelectionMode);
           finally
             EndUndoBlock;
+            DoOnPaintTransientEx(ttAfter,true);
           end;
-
           // Restore Selection mods
           ActiveSelectionMode := OldSelectionMode;
-
         end;
 //++ CodeFolding
       ecFoldAll: begin CollapseAll; end;
