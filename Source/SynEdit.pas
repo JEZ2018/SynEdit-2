@@ -822,6 +822,8 @@ type
     procedure HookTextBuffer(aBuffer: TSynEditStringList;
       aUndo, aRedo: TSynEditUndoList);
     procedure UnHookTextBuffer;
+    procedure CopyLine(CopyUp: Boolean);
+    procedure MoveLine(MoveUp: Boolean);
 //++ CodeFolding
     procedure CollapseAll;
     procedure UncollapseAll;
@@ -1248,6 +1250,84 @@ begin
   finally
     Clipboard.Close;
   end;
+end;
+
+procedure TCustomSynEdit.CopyLine(CopyUp: Boolean);
+var
+  Caret, CaretNew, StartOfBlock, EndOfBlock: TBufferCoord;
+  Counter, CaretRow: Integer;
+  OldSelectionMode: TSynSelectionMode;
+  Text: string;
+begin
+  // Get Caret and selection
+  Caret := CaretXY;
+  StartOfBlock := fBlockBegin;
+  EndOfBlock := fBlockEnd;
+  // No of Lines
+  Counter := Abs(fBlockEnd.Line - fBlockBegin.Line);
+  // store the lines
+  Text  := '';
+  for CaretRow := BlockBegin.Line to BlockEnd.Line do
+  begin
+    if (CaretRow = BlockEnd.Line) and
+      (fBlockBegin.Line <> fBlockEnd.Line) and (BlockEnd.Char=1)
+    then
+    begin
+      Dec(Counter);
+      Break;
+    end;
+    if CopyUp then
+      Text := Text + Lines[CaretRow -1] + SLineBreak
+    else
+      Text := Text + SLineBreak + Lines[CaretRow -1]
+  end;
+  // Deal with Selection modes
+  OldSelectionMode := ActiveSelectionMode;
+  ActiveSelectionMode := smNormal;
+
+  // group actions for undo redo and reduce transient painting
+  DoOnPaintTransientEx(ttBefore,true);
+  BeginUndoBlock;
+  try
+    // Save caret and selection, so that they can be restored by undo
+    fUndoList.AddChange(crCaret, Caret, Caret, '', OldSelectionMode);
+    fUndoList.AddChange(crSelection, fBlockBegin, fBlockEnd, '', OldSelectionMode);
+
+    //CaretNew is set to the insertion point
+    if CopyUp then
+      CaretNew := BufferCoord(1, BlockBegin.Line)
+    else begin
+      if (fBlockBegin.Line <> fBlockEnd.Line) and (BlockEnd.Char < 2) then
+        CaretNew := BufferCoord(Succ(Length(Lines[BlockEnd.Line-2])), BlockEnd.Line-1)
+      else
+        CaretNew := BufferCoord(Succ(Length(Lines[BlockEnd.Line-1])), BlockEnd.Line);
+    end;
+
+    SetCaretAndSelection(CaretNew, CaretNew, CaretNew);
+    // Adds a copy of the lines below or above
+    SetSelText(Text);
+
+    //New Caret and Selection
+    if not CopyUp then begin
+      Inc(Counter);
+      Inc(Caret.Line, Counter); Inc(StartOfBlock.Line, Counter); Inc(EndOfBlock.Line, Counter);
+    end;
+    SetCaretAndSelection(Caret, StartOfBlock, EndOfBlock);
+
+    // Save caret and selection, so that they can be restored by redo
+    fUndoList.AddChange(crSelection, fBlockBegin, fBlockEnd, '', OldSelectionMode);
+    fUndoList.AddChange(crCaret, Caret, Caret, '', OldSelectionMode);
+
+    // this does nothing but prevents undoing a subsequent Move Line down
+    // to be merged with this one
+    fUndoList.AddChange(crNothing, Caret, Caret, '', fActiveSelectionMode);
+  finally
+    EndUndoBlock;
+    DoOnPaintTransientEx(ttAfter,true);
+  end;
+
+  // Restore Selection mode
+  ActiveSelectionMode := OldSelectionMode;
 end;
 
 procedure TCustomSynEdit.CopyToClipboard;
@@ -7654,164 +7734,11 @@ begin
         end;
       ecCopyLineUp, ecCopyLineDown:
         if not ReadOnly then begin
-          // Get Caret and selection
-          Caret := CaretXY;
-          StartOfBlock := fBlockBegin;
-          EndOfBlock := fBlockEnd;
-          // No of Lines
-          Counter := Abs(fBlockEnd.Line - fBlockBegin.Line);
-          // store the lines
-          S  := '';
-          for vCaretRow := BlockBegin.Line to BlockEnd.Line do
-          begin
-            if (vCaretRow = BlockEnd.Line) and
-              (fBlockBegin.Line <> fBlockEnd.Line) and (BlockEnd.Char=1)
-            then
-            begin
-              Dec(Counter);
-              break;
-            end;
-            if Command = ecCopyLineDown then
-              S := S + SLineBreak + Lines[vCaretRow -1]
-            else
-              S := S + Lines[vCaretRow -1] + SLineBreak;
-          end;
-          // Deal with Selection modes
-          OldSelectionMode := ActiveSelectionMode;
-          ActiveSelectionMode := smNormal;
-
-          // group actions for undo redo and reduce transient painting
-          DoOnPaintTransientEx(ttBefore,true);
-          BeginUndoBlock;
-          try
-            // Save caret and selection, so that they can be restored by undo
-            fUndoList.AddChange(crCaret, Caret, Caret, '', OldSelectionMode);
-            fUndoList.AddChange(crSelection, fBlockBegin, fBlockEnd, '', OldSelectionMode);
-
-            //CaretNew is set to the insertion point
-            if Command = ecCopyLineUp then
-              CaretNew := BufferCoord(1, BlockBegin.Line)
-            else begin
-              if (fBlockBegin.Line <> fBlockEnd.Line) and (BlockEnd.Char = 1) then
-                CaretNew := BufferCoord(Succ(Length(Lines[BlockEnd.Line-2])), BlockEnd.Line-1)
-              else
-                CaretNew := BufferCoord(Succ(Length(Lines[BlockEnd.Line-1])), BlockEnd.Line);
-            end;
-
-            SetCaretAndSelection(CaretNew, CaretNew, CaretNew);
-            // Adds a copy of the lines below or above
-            SetSelText(S);
-
-            //New Caret and Selection
-            if Command = ecCopyLineDown then begin
-              Inc(Counter);
-              Inc(Caret.Line, Counter); Inc(StartOfBlock.Line, Counter); Inc(EndOfBlock.Line, Counter);
-            end;
-            SetCaretAndSelection(Caret, StartOfBlock, EndOfBlock);
-
-            // Save caret and selection, so that they can be restored by redo
-            fUndoList.AddChange(crSelection, fBlockBegin, fBlockEnd, '', OldSelectionMode);
-            fUndoList.AddChange(crCaret, Caret, Caret, '', OldSelectionMode);
-
-            // this does nothing but prevents undoing a subsequent Move Line down
-            // to be merged with this one
-            fUndoList.AddChange(crNothing, Caret, Caret, '', fActiveSelectionMode);
-          finally
-            EndUndoBlock;
-            DoOnPaintTransientEx(ttAfter,true);
-          end;
-
-          // Restore Selection mode
-          ActiveSelectionMode := OldSelectionMode;
+          CopyLine(Command = ecCopyLineUp);
         end;
       ecMoveLineUp, ecMoveLineDown :
         if not ReadOnly then begin
-          // check out of the lines ranges
-          if (Command = ecMoveLineDown) and
-            (Max(fBlockEnd.Line, fBlockBegin.Line) >= Lines.Count) then
-              Exit;
-          if (Command = ecMoveLineUp) and
-            (Max(fBlockEnd.Line, fBlockBegin.Line) < 2) then
-              Exit;
-          // Get Caret and selection
-          Caret := CaretXY;
-          StartOfBlock := fBlockBegin;
-          if (fBlockEnd.Line > fBlockBegin.Line) and (fBlockEnd.Char < 2) then begin
-            // store pred line
-            S := Lines[fBlockEnd.Line-2];
-            // align selection to length of pred line
-            fBlockEnd.Char := Length(S)+1;
-            Dec(fBlockEnd.Line);
-          end;
-          EndOfBlock := fBlockEnd;
-
-          // store the lines
-          S  := '';
-          for vCaretRow := BlockBegin.Line to BlockEnd.Line do
-          begin
-            if Command = ecMoveLineDown then
-              S := S + SLineBreak + Lines[vCaretRow -1]
-            else
-              S := S + Lines[vCaretRow -1] + SLineBreak;
-          end;
-          if Command = ecMoveLineDown then
-            S := Lines[BlockEnd.Line]+ S
-          else
-            S := S + Lines[BlockBegin.Line-2];
-          // Deal with Selection modes
-          OldSelectionMode := ActiveSelectionMode;
-          ActiveSelectionMode := smNormal;
-          // group actions for undo redo and reduce transient painting
-          DoOnPaintTransientEx(ttBefore,true);
-          BeginUndoBlock;
-          try
-            // Save caret and selection, so that they can be restored by undo
-            fUndoList.AddChange(crCaret, Caret, Caret, '', OldSelectionMode);
-            fUndoList.AddChange(crSelection, fBlockBegin, fBlockEnd, '', OldSelectionMode);
-            if Command = ecMoveLineDown then begin
-              //CaretNew is set to the insertion point
-              CaretNew := BufferCoord(1, BlockBegin.Line);
-              SetCaretAndSelection(
-                CaretNew, CaretNew,
-                BufferCoord(Length(Lines[BlockEnd.Line])+1, BlockEnd.Line+1)
-              );
-            end
-            else begin
-              //CaretNew is set to the insertion point
-              CaretNew := BufferCoord(1, BlockBegin.Line-1);
-              SetCaretAndSelection(
-                CaretNew, CaretNew,
-                BufferCoord(Length(Lines[BlockEnd.Line-1])+1, BlockEnd.Line)
-              );
-            end;
-            // Adds a copy of the lines below or above
-            SetSelText(S);
-
-            if Command = ecMoveLineDown then begin
-              Inc(Caret.Line);
-              Inc(StartOfBlock.Line);
-              Inc(EndOfBlock.Line);
-            end
-            else begin
-              Dec(Caret.Line);
-              Dec(StartOfBlock.Line);
-              Dec(EndOfBlock.Line);
-            end;
-            SetCaretAndSelection(Caret, StartOfBlock, EndOfBlock);
-
-            // Save caret and selection, so that they can be restored by redo
-            fUndoList.AddChange(crSelection, fBlockBegin, fBlockEnd, '', OldSelectionMode);
-            fUndoList.AddChange(crCaret, Caret, Caret, '', OldSelectionMode);
-
-            // this does nothing but prevents undoing a subsequent Move Line down
-            // to be merged with this one
-            fUndoList.AddChange(crNothing, Caret, Caret, '', fActiveSelectionMode);
-          finally
-            EndUndoBlock;
-            DoOnPaintTransientEx(ttAfter,true);
-          end;
-          // Restore Selection mods
-          ActiveSelectionMode := OldSelectionMode;
+          MoveLine(Command = ecMoveLineUp)
         end;
 //++ CodeFolding
       ecFoldAll: begin CollapseAll; end;
@@ -8708,6 +8635,104 @@ begin
   // Restore fLastCaretX after moving caret, since UpdateLastCaretX, called by
   // SetCaretXYEx, changes them. This is the one case where we don't want that.
   fLastCaretX := SaveLastCaretX;
+end;
+
+procedure TCustomSynEdit.MoveLine(MoveUp: Boolean);
+var
+  Caret, CaretNew, StartOfBlock, EndOfBlock: TBufferCoord;
+  Counter, CaretRow: Integer;
+  OldSelectionMode: TSynSelectionMode;
+  Text: string;
+begin
+  // check out of the lines ranges
+  if MoveUp then begin
+    if BlockBegin.Line < 2 then
+      Exit
+  end
+  else begin
+    if BlockEnd.Line >= Lines.Count then
+      Exit;
+  end;
+
+  // Get Caret and selection
+  Caret := CaretXY;
+  StartOfBlock := fBlockBegin;
+  if (fBlockEnd.Line > fBlockBegin.Line) and (fBlockEnd.Char < 2) then begin
+    // store pred line
+    Text := Lines[fBlockEnd.Line-2];
+    // align selection to length of pred line
+    fBlockEnd.Char := Length(Text)+1;
+    Dec(fBlockEnd.Line);
+  end;
+  EndOfBlock := fBlockEnd;
+
+  // store the lines
+  Text := '';
+  for CaretRow := BlockBegin.Line to BlockEnd.Line do
+  begin
+    if MoveUp then
+      Text := Text + Lines[CaretRow -1] + SLineBreak
+    else
+      Text := Text + SLineBreak + Lines[CaretRow -1]
+  end;
+  if MoveUp then
+    Text := Text + Lines[BlockBegin.Line-2]
+  else
+    Text := Lines[BlockEnd.Line]+ Text;
+  // Deal with Selection modes
+  OldSelectionMode := ActiveSelectionMode;
+  ActiveSelectionMode := smNormal;
+  // group actions for undo redo and reduce transient painting
+  DoOnPaintTransientEx(ttBefore,true);
+  BeginUndoBlock;
+  try
+    // Save caret and selection, so that they can be restored by undo
+    fUndoList.AddChange(crCaret, Caret, Caret, '', OldSelectionMode);
+    fUndoList.AddChange(crSelection, fBlockBegin, fBlockEnd, '', OldSelectionMode);
+    if MoveUp then begin
+      //CaretNew is set to the insertion point
+      CaretNew := BufferCoord(1, BlockBegin.Line-1);
+      SetCaretAndSelection(
+        CaretNew, CaretNew,
+        BufferCoord(Length(Lines[BlockEnd.Line-1])+1, BlockEnd.Line)
+      );
+    end
+    else begin
+      //CaretNew is set to the insertion point
+      CaretNew := BufferCoord(1, BlockBegin.Line);
+      SetCaretAndSelection(
+        CaretNew, CaretNew,
+        BufferCoord(Length(Lines[BlockEnd.Line])+1, BlockEnd.Line+1)
+      );
+    end;
+    // Adds a copy of the lines below or above
+    SetSelText(Text);
+
+    if MoveUp then begin
+      Dec(Caret.Line);
+      Dec(StartOfBlock.Line);
+      Dec(EndOfBlock.Line);
+    end
+    else begin
+      Inc(Caret.Line);
+      Inc(StartOfBlock.Line);
+      Inc(EndOfBlock.Line);
+    end;
+    SetCaretAndSelection(Caret, StartOfBlock, EndOfBlock);
+
+    // Save caret and selection, so that they can be restored by redo
+    fUndoList.AddChange(crSelection, fBlockBegin, fBlockEnd, '', OldSelectionMode);
+    fUndoList.AddChange(crCaret, Caret, Caret, '', OldSelectionMode);
+
+    // this does nothing but prevents undoing a subsequent Move Line down
+    // to be merged with this one
+    fUndoList.AddChange(crNothing, Caret, Caret, '', fActiveSelectionMode);
+  finally
+    EndUndoBlock;
+    DoOnPaintTransientEx(ttAfter,true);
+  end;
+  // Restore Selection mods
+  ActiveSelectionMode := OldSelectionMode;
 end;
 
 procedure TCustomSynEdit.MoveCaretAndSelection(const ptBefore, ptAfter: TBufferCoord;
