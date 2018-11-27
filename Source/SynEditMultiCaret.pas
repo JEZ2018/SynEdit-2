@@ -77,8 +77,15 @@ begin
 end;
 
 procedure TCarets.Assign(Other: TCarets);
+var
+  I: Integer;
 begin
-
+  Clear;
+  for I := 0 to Other.Count-1 do begin
+    Add(
+      TCaretItem.Create(Other[I].PosX, Other[I].PosY, Other[I].SelLen)
+    )
+  end;
 end;
 
 procedure TCarets.Clear;
