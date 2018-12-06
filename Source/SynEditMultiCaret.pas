@@ -151,7 +151,7 @@ var
 begin
   for Item in FList do
     Item.Free;
-  FList.Free;
+  FList.Clear;
   if Assigned(FOnChanged) then
     FOnChanged(Self)
 end;
