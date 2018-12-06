@@ -2174,9 +2174,10 @@ begin
     DoOnGutterClick(Button, X, Y)
   end;
 
-  if (Button = mbLeft) and (ssAlt in Shift) then begin
-    fMultiCaretController.Carets.Add(X, Y, 0);
-  end;
+  if (Button = mbLeft) and (ssAlt in Shift) then
+    fMultiCaretController.Carets.Add(X, Y, 0)
+  else
+    fMultiCaretController.Carets.Clear;
 
 
   SetFocus;
