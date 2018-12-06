@@ -90,9 +90,5 @@ object TMainForm: TTMainForm
     Options = [eoAutoIndent, eoDragDropEditing, eoEnhanceEndKey, eoGroupUndo, eoShowScrollHint, eoSmartTabDelete, eoSmartTabs, eoTabIndent, eoTabsToSpaces, eoTrimTrailingSpaces]
     TabWidth = 4
     FontSmoothing = fsmNone
-    ExplicitLeft = -81
-    ExplicitTop = -86
-    ExplicitWidth = 635
-    ExplicitHeight = 375
   end
 end

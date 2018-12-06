@@ -217,6 +217,10 @@ const
   ecUnfoldRegions    = 732;
   //-- CodeFolding
 
+  //++ MultiCaret
+  ecAddNewCaret     = 733;
+  //--MultiCaret
+
   ecUserFirst       = 1001; // Start of user-defined commands
 
 type
@@ -314,7 +318,7 @@ uses
 
 const
 //++ CodeFolding
-  EditorCommandStrs: array[0..116] of TIdentMapEntry = (
+  EditorCommandStrs: array[0..117] of TIdentMapEntry = (
 //-- CodeFolding
     (Value: ecNone; Name: 'ecNone'),
     (Value: ecLeft; Name: 'ecLeft'),
@@ -433,8 +437,12 @@ const
     (Value: ecUnfoldLevel2; Name:'ecUnfoldLevel2'),
     (Value: ecUnfoldLevel3; Name:'ecUnfoldLevel3'),
     (Value: ecFoldRegions; Name:'ecFoldRanges'),
-    (Value: ecUnfoldRegions; Name:'ecUnfoldRanges'));
-//-- CodeFolding
+    (Value: ecUnfoldRegions; Name:'ecUnfoldRanges'),
+    //-- CodeFolding
+    //++ MultiCaret
+    (Value: ecAddNewCaret; Name:'ecAddNewCaret'));
+    //--MultiCaret
+
 procedure GetEditorCommandValues(Proc: TGetStrProc);
 var
   i: integer;
@@ -852,6 +860,9 @@ begin
   AddKey(ecUnfoldLevel2, ord('K'), [ssCtrl, ssShift], Ord('2'), [ssCtrl, ssShift]);
   AddKey(ecUnfoldLevel3, ord('K'), [ssCtrl, ssShift], Ord('3'), [ssCtrl, ssShift]);
 //-- CodeFolding
+//++ MultiCaret
+//ecAddNewCaret
+//-- MultiCaret
 end;
 
 procedure TSynEditKeyStrokes.SetItem(Index: Integer; Value: TSynEditKeyStroke);

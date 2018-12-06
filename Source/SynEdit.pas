@@ -74,6 +74,7 @@ uses
   SynEditHighlighter,
   SynEditKbdHandler,
   SynEditCodeFolding,
+  SynEditMultiCaret,
   WideStrUtils,
   Math,
   SysUtils,
@@ -312,7 +313,7 @@ type
   TCustomSynEditSearchNotFoundEvent = procedure(Sender: TObject;
     FindText: string) of object;
 
-  TCustomSynEdit = class(TCustomControl)
+  TCustomSynEdit = class(TCustomControl, IAbstractEditor)
   private
     procedure WMCancelMode(var Message: TMessage); message WM_CANCELMODE;
     procedure WMCaptureChanged(var Msg: TMessage); message WM_CAPTURECHANGED;
@@ -344,6 +345,9 @@ type
     fCodeFolding: TSynCodeFolding;
     fAllFoldRanges: TSynFoldRanges;
 //-- CodeFolding
+//++ MultiCaret
+    fMultiCaretController: TMultiCaretController;
+//-- MultiCaret
     fAlwaysShowCaret: Boolean;
     fBlockBegin: TBufferCoord;
     fBlockEnd: TBufferCoord;
@@ -970,6 +974,10 @@ type
     property OnScanForFoldRanges: TScanForFoldRangesEvent
       read fOnScanForFoldRanges write fOnScanForFoldRanges;
 //-- CodeFolding
+//++ IAbstractEditor
+    function GetCanvas: TCanvas;
+    function GetRect: TRect;
+//-- IAbstractEditor
   published
     property Cursor default crIBeam;
     property OnSearchNotFound: TCustomSynEditSearchNotFoundEvent
@@ -1377,7 +1385,10 @@ begin
   fCodeFolding.OnChange := OnCodeFoldingChange;
   fAllFoldRanges := TSynFoldRanges.Create;
 //-- CodeFolding
-
+//++ MultiCaret
+  fMultiCaretController := TMultiCaretController.Create(Self);
+  fMultiCaretController.Active := True;
+//-- MultiCaret
   SynFontChanged(nil);
 end;
 
@@ -2163,6 +2174,11 @@ begin
     DoOnGutterClick(Button, X, Y)
   end;
 
+  if (Button = mbLeft) and (ssAlt in Shift) then begin
+    fMultiCaretController.Carets.Add(X, Y, 0);
+  end;
+
+
   SetFocus;
   Windows.SetFocus(Handle);
 end;
@@ -2387,6 +2403,7 @@ begin
     DoOnPaintTransient(ttAfter);
   finally
     UpdateCaret;
+    fMultiCaretController.Repaint;
   end;
 end;
 
@@ -5495,6 +5512,11 @@ begin
   result := not ReadOnly and fUndoList.CanUndo;
 end;
 
+function TCustomSynEdit.GetCanvas: TCanvas;
+begin
+  Result := Canvas
+end;
+
 function TCustomSynEdit.GetCanRedo: Boolean;
 begin
   result := not ReadOnly and fRedoList.CanUndo;
@@ -6901,7 +6923,6 @@ begin
     end;
   end;
   Exclude(fStateFlags, sfCaretVisible);
-
   if Focused or FAlwaysShowCaret then
   begin
     CreateCaret(Handle, 0, cw, ch);
@@ -9636,6 +9657,11 @@ end;
 function TCustomSynEdit.GetReadOnly: Boolean;
 begin
   Result := fReadOnly;
+end;
+
+function TCustomSynEdit.GetRect: TRect;
+begin
+  Result := Self.ClientRect
 end;
 
 procedure TCustomSynEdit.SetReadOnly(Value: Boolean);
