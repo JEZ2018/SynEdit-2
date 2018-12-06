@@ -92,7 +92,9 @@ type
 
   IAbstractEditor = interface
     function GetCanvas: TCanvas;
-    function GetRect: TRect;
+    function GetClientRect: TRect;
+    property Canvas:TCanvas read GetCanvas;
+    property ClientRect:TRect read GetClientRect;
   end;
 
   TMultiCaretController = class
@@ -337,7 +339,7 @@ var
 begin
   for Caret in FCarets do begin
     R := CaretPointToRect(Caret.ToPoint);
-    if IntersectRect(R2, R, FEditor.GetRect) then
+    if IntersectRect(R2, R, FEditor.GetClientRect) then
       InvertRect(FEditor.GetCanvas.Handle, R);
   end;
 end;
@@ -352,9 +354,9 @@ begin
   if FShown then begin
     RectFrom := CaretPointToRect(PointFrom);
     RectTo := CaretPointToRect(PointTo);
-    if IntersectRect(R2, RectFrom, FEditor.GetRect) then
+    if IntersectRect(R2, RectFrom, FEditor.GetClientRect) then
       InvertRect(FEditor.GetCanvas.Handle, RectFrom);
-    if IntersectRect(R2, RectTo, FEditor.GetRect) then
+    if IntersectRect(R2, RectTo, FEditor.GetClientRect) then
       InvertRect(FEditor.GetCanvas.Handle, RectTo);
   end;
 end;

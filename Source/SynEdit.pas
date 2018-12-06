@@ -976,7 +976,6 @@ type
 //-- CodeFolding
 //++ IAbstractEditor
     function GetCanvas: TCanvas;
-    function GetRect: TRect;
 //-- IAbstractEditor
   published
     property Cursor default crIBeam;
@@ -9658,11 +9657,6 @@ end;
 function TCustomSynEdit.GetReadOnly: Boolean;
 begin
   Result := fReadOnly;
-end;
-
-function TCustomSynEdit.GetRect: TRect;
-begin
-  Result := Self.ClientRect
 end;
 
 procedure TCustomSynEdit.SetReadOnly(Value: Boolean);
