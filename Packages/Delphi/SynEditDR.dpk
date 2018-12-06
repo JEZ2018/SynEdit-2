@@ -139,7 +139,6 @@ contains
   SynHighlighterXML in '..\..\Source\SynHighlighterXML.pas',
   SynMacroRecorder in '..\..\Source\SynMacroRecorder.pas',
   SynMemo in '..\..\Source\SynMemo.pas',
-  SynRegExpr in '..\..\Source\SynRegExpr.pas',
   SynHighlighterCss in '..\..\Source\SynHighlighterCss.pas',
   SynHighlighterLDraw in '..\..\Source\SynHighlighterLDraw.pas',
   SynHighlighterURI in '..\..\Source\SynHighlighterURI.pas',

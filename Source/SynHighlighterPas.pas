@@ -1,4 +1,4 @@
-{------------------------------------------------------------------------------
+﻿{------------------------------------------------------------------------------
 The contents of this file are subject to the Mozilla Public License
 Version 1.1 (the "License"); you may not use this file except in compliance
 with the License. You may obtain a copy of the License at
@@ -63,7 +63,7 @@ uses
   SysUtils,
 //++ CodeFolding
   SynEditCodeFolding,
-  SynRegExpr,
+  RegularExpressions,
 //-- CodeFolding
   Classes;
 
@@ -96,7 +96,7 @@ type
     fStringAttri: TSynHighlighterAttributes;
     fCharAttri: TSynHighlighterAttributes;
     fNumberAttri: TSynHighlighterAttributes;
-    fFloatAttri: TSynHighlighterAttributes;                                                 
+    fFloatAttri: TSynHighlighterAttributes;
     fHexAttri: TSynHighlighterAttributes;
     fKeyAttri: TSynHighlighterAttributes;
     fSymbolAttri: TSynHighlighterAttributes;
@@ -108,9 +108,9 @@ type
     fDelphiVersion: TDelphiVersion;
     fPackageSource: Boolean;
 //++ CodeFolding
-    RE_BlockBegin : TRegExpr;
-    RE_BlockEnd : TRegExpr;
-    RE_Code: TRegExpr;
+    RE_BlockBegin : TRegEx;
+    RE_BlockEnd : TRegEx;
+    RE_Code: TRegEx;
 //-- CodeFolding
     function AltFunc(Index: Integer): TtkTokenKind;
     function KeyWordFunc(Index: Integer): TtkTokenKind;
@@ -183,7 +183,6 @@ type
     class function GetFriendlyLanguageName: string; override;
   public
     constructor Create(AOwner: TComponent); override;
-    destructor Destroy; override; 
     function GetDefaultAttribute(Index: Integer): TSynHighlighterAttributes;
       override;
     function GetEol: Boolean; override;
@@ -695,28 +694,10 @@ begin
   fDefaultFilter := SYNS_FilterPascal;
 
 //++ CodeFolding
-  RE_BlockBegin := TRegExpr.Create;
-  RE_BlockBegin.Expression := '\b(begin|record|class)\b';
-  RE_BlockBegin.ModifierI := True;
-
-  RE_BlockEnd := TRegExpr.Create;
-  RE_BlockEnd.Expression := '\bend\b';
-  RE_BlockEnd.ModifierI := True;
-
-  RE_Code := TRegExpr.Create;
-  RE_Code.Expression := '^\s*(function|procedure)\b';
-  RE_Code.ModifierI := True;
+  RE_BlockBegin.Create('\b(begin|record|class)\b', [roNotEmpty, roIgnoreCase]);
+  RE_BlockEnd.Create('\bend\b', [roNotEmpty, roIgnoreCase]);
+  RE_Code.Create('^\s*(function|procedure)\b', [roNotEmpty, roIgnoreCase]);
 //-- CodeFolding
-end;
-
-destructor TSynPasSyn.Destroy; 
-begin 
-//++ CodeFolding
-  FreeAndNil(RE_BlockBegin); 
-  FreeAndNil(RE_BlockEnd); 
-  FreeAndNil(RE_Code); 
-//-- CodeFolding
-  inherited; 
 end;
 
 procedure TSynPasSyn.AddressOpProc;
@@ -1128,29 +1109,34 @@ var
   function BlockDelimiter(Line: Integer): Boolean;
   var
     Index: Integer;
+    Match : TMatch;
   begin
     Result := False;
 
-    if RE_BlockBegin.Exec(CurLine) then
+    Match := RE_BlockBegin.Match(CurLine);
+    if Match.Success then
     begin
       // Char must have proper highlighting (ignore stuff inside comments...)
-      Index :=  RE_BlockBegin.MatchPos[0];
+      Index :=  Match.Index;
       if GetHighlighterAttriAtRowCol(LinesToScan, Line, Index) <> fCommentAttri then
       begin
         // And ignore lines with both opening and closing chars in them
-        Re_BlockEnd.InputString := CurLine;
-        if not RE_BlockEnd.Exec(Index + 1) then begin
+        if not RE_BlockEnd.IsMatch(CurLine, Index + 1) then begin
           FoldRanges.StartFoldRange(Line + 1, FT_Standard);
           Result := True;
         end;
       end;
-    end else if RE_BlockEnd.Exec(CurLine) then
-    begin
-      Index :=  RE_BlockBegin.MatchPos[0];
-      if GetHighlighterAttriAtRowCol(LinesToScan, Line, Index) <> fCommentAttri then
-      begin
-        FoldRanges.StopFoldRange(Line + 1, FT_Standard);
-        Result := True;
+    end else begin
+      Match := RE_BlockEnd.Match(CurLine);
+      if Match.Success then begin
+        begin
+          Index :=  Match.Index;
+          if GetHighlighterAttriAtRowCol(LinesToScan, Line, Index) <> fCommentAttri then
+          begin
+            FoldRanges.StopFoldRange(Line + 1, FT_Standard);
+            Result := True;
+          end;
+        end;
       end;
     end;
   end;
@@ -1240,7 +1226,7 @@ begin
     if Uppercase(TrimLeft(CurLine)) = 'IMPLEMENTATION' then
       FoldRanges.StartFoldRange(Line +1, FT_Implementation)
     // Functions and procedures
-    else if RE_Code.Exec(CurLine) then
+    else if RE_Code.IsMatch(CurLine) then
       FoldRanges.StartFoldRange(Line +1, FT_CodeDeclaration)
     // Find begin or end  (Fold Type 1)
     else if not BlockDelimiter(Line) then
@@ -1257,6 +1243,7 @@ Var
   i, j, SkipTo: Integer;
   ImplementationIndex: Integer;
   FoldRange: TSynFoldRange;
+  Match : TMatch;
 begin
   ImplementationIndex := - 1;
   for i  := FoldRanges.Ranges.Count - 1 downto 0 do
@@ -1288,23 +1275,26 @@ begin
           // possibly begin end;
             if FoldRange.ToLine <= SkipTo then
               Continue
-            else if RE_BlockBegin.Exec(LinesToScan[FoldRange.FromLine - 1]) then
-            begin
-              if LowerCase(RE_BlockBegin.Match[0]) = 'begin' then
+            else begin
+              Match := RE_BlockBegin.Match(LinesToScan[FoldRange.FromLine - 1]);
+              if Match.Success then
               begin
-                // function or procedure followed by begin end block
-                // Adjust ToLine
-                FoldRanges.Ranges.List[i].ToLine := FoldRange.ToLine;
-                FoldRanges.Ranges.List[i].FoldType := FT_CodeDeclarationWithBody;
-                break
+                if LowerCase(Match.Value) = 'begin' then
+                begin
+                  // function or procedure followed by begin end block
+                  // Adjust ToLine
+                  FoldRanges.Ranges.List[i].ToLine := FoldRange.ToLine;
+                  FoldRanges.Ranges.List[i].FoldType := FT_CodeDeclarationWithBody;
+                  break
+                end else
+                begin
+                  // class or record declaration follows, so
+                  FoldRanges.Ranges.Delete(i);
+                  break;
+                 end;
               end else
-              begin
-                // class or record declaration follows, so
-                FoldRanges.Ranges.Delete(i);
-                break;
-               end;
-            end else
-              Assert(False, 'TSynDWSSyn.AdjustFoldRanges');
+                Assert(False, 'TSynHighlighterPas.AdjustFoldRanges');
+            end;
         else
           begin
             if FoldRange.ToLine <= SkipTo then
