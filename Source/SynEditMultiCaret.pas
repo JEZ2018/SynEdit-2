@@ -72,9 +72,15 @@ type
   strict private
     FList: TList<TCaretItem>;
     FOnChanged: TNotifyEvent;
+    FOnBeforeClear: TNotifyEvent;
+    FOnBeforeCaretDelete: TNotifyEvent;
     function GetItem(Index: Integer): TCaretItem;
   protected
     property OnChanged: TNotifyEvent read FOnChanged write FOnChanged;
+    property OnBeforeClear: TNotifyEvent read FOnBeforeClear
+      write FOnBeforeClear;
+    property OnBeforeCaretDelete: TNotifyEvent read FOnBeforeCaretDelete
+      write FOnBeforeCaretDelete;
   public
     constructor Create; virtual;
     destructor Destroy; override;
@@ -93,8 +99,18 @@ type
   IAbstractEditor = interface
     function GetCanvas: TCanvas;
     function GetClientRect: TRect;
-    property Canvas:TCanvas read GetCanvas;
-    property ClientRect:TRect read GetClientRect;
+    property Canvas: TCanvas read GetCanvas;
+    property ClientRect: TRect read GetClientRect;
+  end;
+
+  TCaretShape = record
+    Width: Integer;
+    Height: Integer;
+    Offset: TPoint;
+  public
+    constructor Create(const aWidth, aHeight: Integer; const aOffset: TPoint);
+    procedure SetToDefault;
+    class operator Equal(a: TCaretShape; b: TCaretShape): Boolean;
   end;
 
   TMultiCaretController = class
@@ -104,11 +120,15 @@ type
     FBlinkTimer: TTimer;
     FShown: Boolean;
     FActive: Boolean;
+    FShape: TCaretShape;
     function CaretPointToRect(const CaretPoint: TPoint): TRect;
     procedure SetActive(const Value: Boolean);
+    procedure SetShape(const Value: TCaretShape);
     procedure InvertRects;
     procedure Blink(Sender: TObject);
     procedure DoCaretsChanged(Sender: TObject);
+    procedure DoBeforeCaretsClear(Sender: TObject);
+    procedure DoBeforeCaretsDelete(Sender: TObject);
     procedure DoCaretMoved(Sender: TCaretItem; const PointFrom: TPoint;
       const PointTo: TPoint);
     procedure DoCaretSelLenChanged(Sender: TCaretItem; const ValueFrom: Integer;
@@ -116,9 +136,10 @@ type
   public
     constructor Create(Editor: IAbstractEditor);
     destructor Destroy; override;
-    procedure Repaint;
+    procedure Paint;
     property Active: Boolean read FActive write SetActive;
     property Carets: TCarets read FCarets;
+    property Shape: TCaretShape read FShape write SetShape;
   end;
 
 implementation
@@ -151,6 +172,8 @@ procedure TCarets.Clear;
 var
   Item: TCaretItem;
 begin
+  if Assigned(FOnBeforeClear) then
+    FOnBeforeClear(Self);
   for Item in FList do
     Item.Free;
   FList.Clear;
@@ -175,6 +198,8 @@ var
 begin
   if InRange(Index) then
   begin
+    if Assigned(FOnBeforeCaretDelete) then
+      FOnBeforeCaretDelete(FList[Index]);
     FList[Index].Free;
     FList.Delete(Index);
     for I := Index to FList.Count-1 do
@@ -285,8 +310,7 @@ end;
 
 function TCaretItem.ToPoint: TPoint;
 begin
-  Result.X := FPosX;
-  Result.Y := FPosY;
+  Result := Point(FPosX, FPosY);
 end;
 
 { TMultiCaretController }
@@ -303,10 +327,11 @@ var
   CaretHeight, CaretWidth: Integer;
 
 begin
-  CaretHeight := 15;
-  CaretWidth := 2;
+  CaretHeight := FShape.Height;
+  CaretWidth := FShape.Width;
   P := CaretPoint;
-  Inc(P.Y, 10);
+  Inc(P.Y, FShape.Offset.Y);
+  Inc(P.X, FShape.Offset.X);
   Result := Rect(P.X, P.Y - CaretHeight, P.X + CaretWidth, P.Y);
 end;
 
@@ -319,6 +344,7 @@ begin
 
   FCarets := TCarets.Create;
   FCarets.OnChanged := DoCaretsChanged;
+  FCarets.OnBeforeClear := DoBeforeCaretsClear;
 
   FEditor := Editor;
 end;
@@ -345,6 +371,26 @@ begin
 end;
 
 
+procedure TMultiCaretController.DoBeforeCaretsClear(Sender: TObject);
+begin
+  if FShown then
+    InvertRects;
+end;
+
+procedure TMultiCaretController.DoBeforeCaretsDelete(Sender: TObject);
+var
+  R, R2: TRect;
+  Caret: TCaretItem;
+
+begin
+  if FShown then begin
+    Caret := TCaretItem(Sender);
+    R := CaretPointToRect(Caret.ToPoint);
+    if IntersectRect(R2, R, FEditor.GetClientRect) then
+      InvertRect(FEditor.GetCanvas.Handle, R);
+  end;
+end;
+
 procedure TMultiCaretController.DoCaretMoved(Sender: TCaretItem;
   const PointFrom, PointTo: TPoint);
 var
@@ -361,7 +407,7 @@ begin
   end;
 end;
 
-procedure TMultiCaretController.Repaint;
+procedure TMultiCaretController.Paint;
 begin
   if FShown then
     InvertRects
@@ -375,6 +421,17 @@ begin
     FActive := Value;
     FShown := False;
     FBlinkTimer.Enabled := Value and (FCarets.Count > 0);
+  end;
+end;
+
+procedure TMultiCaretController.SetShape(const Value: TCaretShape);
+begin
+  if not (FShape = Value) then begin
+    if FShown then
+      InvertRects;
+    FShape := Value;
+    if FShown then
+      InvertRects;
   end;
 end;
 
@@ -395,6 +452,28 @@ procedure TMultiCaretController.DoCaretSelLenChanged(Sender: TCaretItem;
   const ValueFrom, ValueTo: Integer);
 begin
   // TODO
+end;
+
+{ TCaretShape }
+
+constructor TCaretShape.Create(const aWidth, aHeight: Integer;
+  const aOffset: TPoint);
+begin
+  Width := aWidth;
+  Height := aHeight;
+  Offset := aOffset;
+end;
+
+class operator TCaretShape.Equal(a, b: TCaretShape): Boolean;
+begin
+  Result := (a.Width = b.Width) and (a.Height = b.Height) and (a.Offset = b.Offset)
+end;
+
+procedure TCaretShape.SetToDefault;
+begin
+  Width := 2;
+  Height := 10;
+  Offset := Point(0, 0);
 end;
 
 end.

@@ -2403,7 +2403,7 @@ begin
     DoOnPaintTransient(ttAfter);
   finally
     UpdateCaret;
-    fMultiCaretController.Repaint;
+    fMultiCaretController.Paint;
   end;
 end;
 
@@ -6928,6 +6928,7 @@ begin
     CreateCaret(Handle, 0, cw, ch);
     UpdateCaret;
   end;
+  fMultiCaretController.Shape := TCaretShape.Create(cw, ch, FCaretOffset);
 end;
 
 procedure TCustomSynEdit.SetInsertCaret(const Value: TSynEditCaretType);
