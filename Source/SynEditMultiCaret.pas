@@ -44,21 +44,27 @@ type
       const PointTo: TPoint) of object;
     TOnSelLenChanged = procedure(Sender: TCaretItem; const ValueFrom: Integer;
       const ValueTo: Integer) of object;
+    TOnVisibleChanged = procedure(Sender: TCaretItem) of object;
   strict private
     FIndex: Integer;
     FPosX: Integer;
     FPosY: Integer;
     FSelLen: Integer;
+    FVisible: Boolean;
     FOnMoved: TOnMoved;
+    FOnVisibleChanged: TOnVisibleChanged;
     FOnSelLenChanged: TOnSelLenChanged;
     procedure SetPosX(const Value: Integer);
     procedure SetPosY(const Value: Integer);
     procedure SetSelLen(const Value: Integer);
+    procedure SetVisible(const Value: Boolean);
   protected
     property Index: Integer read FIndex write FIndex;
     property OnMoved: TOnMoved read FOnMoved write FOnMoved;
     property OnSelLenChanged: TOnSelLenChanged read FOnSelLenChanged
       write FOnSelLenChanged;
+    property OnVisibleChanged: TOnVisibleChanged read FOnVisibleChanged
+      write FOnVisibleChanged;
   public
     constructor Create; overload;
     constructor Create(PosX, PosY, SelLen: Integer); overload;
@@ -66,6 +72,7 @@ type
     property PosX: Integer read FPosX write SetPosX;
     property PosY: INteger read FPosY write SetPosY;
     property SelLen: Integer read FSelLen write SetSelLen;
+    property Visible: Boolean read FVisible write SetVisible;
   end;
 
   TCarets = class
@@ -75,6 +82,7 @@ type
     FOnBeforeClear: TNotifyEvent;
     FOnBeforeCaretDelete: TNotifyEvent;
     function GetItem(Index: Integer): TCaretItem;
+    function GetDefaultCaret: TCaretItem;
   protected
     property OnChanged: TNotifyEvent read FOnChanged write FOnChanged;
     property OnBeforeClear: TNotifyEvent read FOnBeforeClear
@@ -86,11 +94,12 @@ type
     destructor Destroy; override;
     procedure Add(APosX, APosY, ASelLen: Integer);
     procedure Assign(Other: TCarets);
-    procedure Clear;
+    procedure Clear(const ExcludeFirst: Boolean=True);
     procedure Delete(Index: Integer);
     function Count: Integer;
     function InRange(N: Integer): Boolean;
     property Items[N: Integer]: TCaretItem read GetItem; default;
+    property DefaultCaret: TCaretItem read GetDefaultCaret;
     function IndexOf(APosX, APosY: Integer): Integer;
     function IsLineListed(APosY: Integer): Boolean;
     function GetEnumerator: TEnumerator<TCaretItem>;
@@ -133,10 +142,12 @@ type
       const PointTo: TPoint);
     procedure DoCaretSelLenChanged(Sender: TCaretItem; const ValueFrom: Integer;
       const ValueTo: Integer);
+    procedure DoCaretVisibleChanged(Sender: TCaretItem);
   public
     constructor Create(Editor: IAbstractEditor);
     destructor Destroy; override;
     procedure Paint;
+    procedure Flash;
     property Active: Boolean read FActive write SetActive;
     property Carets: TCarets read FCarets;
     property Shape: TCaretShape read FShape write SetShape;
@@ -168,15 +179,21 @@ begin
   end;
 end;
 
-procedure TCarets.Clear;
+procedure TCarets.Clear(const ExcludeFirst: Boolean);
 var
   Item: TCaretItem;
 begin
-  if Assigned(FOnBeforeClear) then
-    FOnBeforeClear(Self);
-  for Item in FList do
-    Item.Free;
-  FList.Clear;
+  if ExcludeFirst then begin
+    while Count > 1 do
+      Delete(1);
+  end
+  else begin
+    if Assigned(FOnBeforeClear) then
+      FOnBeforeClear(Self);
+    for Item in FList do
+      Item.Free;
+    FList.Clear;
+  end;
   if Assigned(FOnChanged) then
     FOnChanged(Self)
 end;
@@ -213,6 +230,13 @@ destructor TCarets.Destroy;
 begin
 
   inherited;
+end;
+
+function TCarets.GetDefaultCaret: TCaretItem;
+begin
+  if Count = 0 then
+    Add(0, 0, 0);
+  Result := FList[0];
 end;
 
 function TCarets.GetEnumerator: TEnumerator<TCaretItem>;
@@ -263,10 +287,12 @@ constructor TCaretItem.Create;
 begin
   FPosX := -1;
   FPosY := -1;
+  FVisible := True;
 end;
 
 constructor TCaretItem.Create(PosX, PosY, SelLen: Integer);
 begin
+  Create;
   FPosX := PosX;
   FPosY := PosY;
   FSelLen := SelLen;
@@ -305,6 +331,15 @@ begin
     FSelLen := Value;
     if Assigned(FOnSelLenChanged) then
       FOnSelLenChanged(Self, ValueFrom, FSelLen)
+  end;
+end;
+
+procedure TCaretItem.SetVisible(const Value: Boolean);
+begin
+  if Value <> FVisible then begin
+    FVisible := Value;
+    if Assigned(FOnVisibleChanged) then
+      FOnVisibleChanged(Self)
   end;
 end;
 
@@ -363,11 +398,12 @@ var
   R, R2: TRect;
 
 begin
-  for Caret in FCarets do begin
-    R := CaretPointToRect(Caret.ToPoint);
-    if IntersectRect(R2, R, FEditor.GetClientRect) then
-      InvertRect(FEditor.GetCanvas.Handle, R);
-  end;
+  for Caret in FCarets do
+    if Caret.Visible then begin
+      R := CaretPointToRect(Caret.ToPoint);
+      if IntersectRect(R2, R, FEditor.GetClientRect) then
+        InvertRect(FEditor.GetCanvas.Handle, R);
+    end;
 end;
 
 
@@ -444,6 +480,8 @@ begin
       Caret.OnMoved := DoCaretMoved;
     if not Assigned(Caret.OnSelLenChanged) then
       Caret.OnSelLenChanged := DoCaretSelLenChanged;
+    if not Assigned(Caret.OnVisibleChanged) then
+      Caret.OnVisibleChanged := DoCaretVisibleChanged;
   end;
   FBlinkTimer.Enabled := FActive and (FCarets.Count > 0);
 end;
@@ -452,6 +490,30 @@ procedure TMultiCaretController.DoCaretSelLenChanged(Sender: TCaretItem;
   const ValueFrom, ValueTo: Integer);
 begin
   // TODO
+end;
+
+procedure TMultiCaretController.DoCaretVisibleChanged(Sender: TCaretItem);
+var
+  R, R2: TRect;
+
+begin
+  if FShown then begin
+    R := CaretPointToRect(Sender.ToPoint);
+      if IntersectRect(R2, R, FEditor.GetClientRect) then
+        InvertRect(FEditor.GetCanvas.Handle, R);
+  end;
+end;
+
+procedure TMultiCaretController.Flash;
+begin
+  OutputDebugString('Flash');
+  if not FShown then begin
+    FShown := True;
+    InvertRects;
+    // restart blink timer
+    FBlinkTimer.Enabled := False;
+    FBlinkTimer.Enabled := True;
+  end;
 end;
 
 { TCaretShape }
