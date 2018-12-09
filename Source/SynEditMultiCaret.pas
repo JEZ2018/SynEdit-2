@@ -94,7 +94,7 @@ type
     destructor Destroy; override;
     procedure Add(APosX, APosY, ASelLen: Integer);
     procedure Assign(Other: TCarets);
-    procedure Clear(const ExcludeFirst: Boolean=True);
+    procedure Clear(const ExcludeDefaultCaret: Boolean=True);
     procedure Delete(Index: Integer);
     function Count: Integer;
     function InRange(N: Integer): Boolean;
@@ -117,7 +117,8 @@ type
     Height: Integer;
     Offset: TPoint;
   public
-    constructor Create(const aWidth, aHeight: Integer; const aOffset: TPoint);
+    constructor Create(const aWidth, aHeight: Integer); overload;
+    constructor Create(const aWidth, aHeight: Integer; const aOffset: TPoint); overload;
     procedure SetToDefault;
     class operator Equal(a: TCaretShape; b: TCaretShape): Boolean;
   end;
@@ -179,13 +180,13 @@ begin
   end;
 end;
 
-procedure TCarets.Clear(const ExcludeFirst: Boolean);
+procedure TCarets.Clear(const ExcludeDefaultCaret: Boolean);
 var
   Item: TCaretItem;
 begin
-  if ExcludeFirst then begin
+  if ExcludeDefaultCaret then begin
     while Count > 1 do
-      Delete(1);
+      Delete(0);
   end
   else begin
     if Assigned(FOnBeforeClear) then
@@ -234,9 +235,10 @@ end;
 
 function TCarets.GetDefaultCaret: TCaretItem;
 begin
-  if Count = 0 then
+  if Count = 0 then begin
     Add(0, 0, 0);
-  Result := FList[0];
+  end;
+  Result := FList.Last;
 end;
 
 function TCarets.GetEnumerator: TEnumerator<TCaretItem>;
@@ -367,7 +369,7 @@ begin
   P := CaretPoint;
   Inc(P.Y, FShape.Offset.Y);
   Inc(P.X, FShape.Offset.X);
-  Result := Rect(P.X, P.Y - CaretHeight, P.X + CaretWidth, P.Y);
+  Result := Rect(P.X, P.Y, P.X + CaretWidth, P.Y + CaretHeight);
 end;
 
 constructor TMultiCaretController.Create(Editor: IAbstractEditor);
@@ -521,9 +523,14 @@ end;
 constructor TCaretShape.Create(const aWidth, aHeight: Integer;
   const aOffset: TPoint);
 begin
+  Create(aWidth, aHeight);
+  Offset := aOffset;
+end;
+
+constructor TCaretShape.Create(const aWidth, aHeight: Integer);
+begin
   Width := aWidth;
   Height := aHeight;
-  Offset := aOffset;
 end;
 
 class operator TCaretShape.Equal(a, b: TCaretShape): Boolean;

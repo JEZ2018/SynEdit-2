@@ -1,4 +1,4 @@
-﻿{-------------------------------------------------------------------------------
+{-------------------------------------------------------------------------------
 The contents of this file are subject to the Mozilla Public License
 Version 1.1 (the "License"); you may not use this file except in compliance
 with the License. You may obtain a copy of the License at
@@ -12,7 +12,7 @@ The Original Code is: SynEdit.pas, released 2000-04-07.
 The Original Code is based on mwCustomEdit.pas by Martin Waldenburg, part of
 the mwEdit component suite.
 Portions created by Martin Waldenburg are Copyright (C) 1998 Martin Waldenburg.
-Unicode translation by Ma�l H�rz.
+Unicode translation by Ma?l H?rz.
 All Rights Reserved.
 
 Contributors to the SynEdit and mwEdit projects are listed in the
@@ -2081,6 +2081,10 @@ var
   bWasSel: Boolean;
   bStartDrag: Boolean;
   TmpBegin, TmpEnd: TBufferCoord;
+  CaretDisplay: TDisplayCoord;
+  CaretPix: TPoint;
+  CX, CY: Integer;
+
 begin
   TmpBegin := FBlockBegin;
   TmpEnd := FBlockEnd;
@@ -2125,6 +2129,7 @@ begin
 
   if Button = mbLeft then
   begin
+    fMultiCaretController.Flash;
     //I couldn't track down why, but sometimes (and definately not all the time)
     //the block positioning is lost.  This makes sure that the block is
     //maintained in case they started a drag operation on the block
@@ -2173,8 +2178,15 @@ begin
     DoOnGutterClick(Button, X, Y)
   end;
 
-  if (Button = mbLeft) and (ssAlt in Shift) then
-    fMultiCaretController.Carets.Add(X, Y, 0)
+  if (Button = mbLeft) and (ssAlt in Shift) then begin
+    CaretDisplay := DisplayXY;
+    if WordWrap and (CaretDisplay.Column > CharsInWindow + 1) then
+      CaretDisplay.Column := CharsInWindow + 1;
+    CaretPix := RowColumnToPixels(CaretDisplay);
+    CX := CaretPix.X + FCaretOffset.X;
+    CY := CaretPix.Y + FCaretOffset.Y;
+    fMultiCaretController.Carets.Add(CX, CY, 0);
+  end
   else
     fMultiCaretController.Carets.Clear;
 
@@ -2403,7 +2415,6 @@ begin
     DoOnPaintTransient(ttAfter);
   finally
     UpdateCaret;
-    fMultiCaretController.Paint;
   end;
 end;
 
@@ -4709,13 +4720,23 @@ begin
     if (CX >= iClientRect.Left) and (CX < iClientRect.Right)
       and (CY >= iClientRect.Top) and (CY < iClientRect.Bottom) then
     begin
-      SetCaretPos(CX, CY);
-      ShowCaret;
+      //SetCaretPos(CX, CY);
+      //ShowCaret;
+      with fMultiCaretController.Carets.DefaultCaret do begin
+        PosX := CX;
+        PosY := CY;
+        Visible := True;
+      end;
     end
     else
     begin
-      SetCaretPos(CX, CY);
-      HideCaret;
+//      SetCaretPos(CX, CY);
+//      HideCaret;
+      with fMultiCaretController.Carets.DefaultCaret do begin
+        PosX := CX;
+        PosY := CY;
+        Visible := False;
+      end;
     end;
     cf.dwStyle := CFS_POINT;
     cf.ptCurrentPos := Point(CX, CY);
@@ -6928,7 +6949,7 @@ begin
     CreateCaret(Handle, 0, cw, ch);
     UpdateCaret;
   end;
-  fMultiCaretController.Shape := TCaretShape.Create(cw, ch, FCaretOffset);
+  fMultiCaretController.Shape := TCaretShape.Create(cw, ch);
 end;
 
 procedure TCustomSynEdit.SetInsertCaret(const Value: TSynEditCaretType);
@@ -9965,6 +9986,7 @@ begin
         ShowCaret;
       end;
     end;
+    fMultiCaretController.Paint;
   end;
 end;
 
