@@ -1924,6 +1924,7 @@ var
 begin
   inherited;
   fKbdHandler.ExecuteKeyDown(Self, Key, Shift);
+  fMultiCaretController.Flash;
 
   Data := nil;
   C := #0;
