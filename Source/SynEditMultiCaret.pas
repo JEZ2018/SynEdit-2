@@ -81,6 +81,7 @@ type
     FOnChanged: TNotifyEvent;
     FOnBeforeClear: TNotifyEvent;
     FOnBeforeCaretDelete: TNotifyEvent;
+    FDefaultCaret: TCaretItem;
     function GetItem(Index: Integer): TCaretItem;
     function GetDefaultCaret: TCaretItem;
   protected
@@ -186,7 +187,7 @@ var
 begin
   if ExcludeDefaultCaret then begin
     while Count > 1 do
-      Delete(0);
+      Delete(1);
   end
   else begin
     if Assigned(FOnBeforeClear) then
@@ -208,6 +209,8 @@ constructor TCarets.Create;
 begin
   inherited;
   FList:= TList<TCaretItem>.Create;
+  FDefaultCaret := TCaretItem.Create;
+  FDefaultCaret.Visible := False;
 end;
 
 procedure TCarets.Delete(Index: Integer);
@@ -229,16 +232,14 @@ end;
 
 destructor TCarets.Destroy;
 begin
-
+  Clear(False);
+  FDefaultCaret.Free;
   inherited;
 end;
 
 function TCarets.GetDefaultCaret: TCaretItem;
 begin
-  if Count = 0 then begin
-    Add(0, 0, 0);
-  end;
-  Result := FList.Last;
+  Result := FDefaultCaret;
 end;
 
 function TCarets.GetEnumerator: TEnumerator<TCaretItem>;
@@ -382,6 +383,9 @@ begin
   FCarets := TCarets.Create;
   FCarets.OnChanged := DoCaretsChanged;
   FCarets.OnBeforeClear := DoBeforeCaretsClear;
+  FCarets.DefaultCaret.OnMoved := DoCaretMoved;
+  FCarets.DefaultCaret.OnSelLenChanged := DoCaretSelLenChanged;
+  FCarets.DefaultCaret.OnVisibleChanged := DoCaretVisibleChanged;
 
   FEditor := Editor;
 end;
@@ -399,13 +403,19 @@ var
   P: TPoint;
   R, R2: TRect;
 
-begin
-  for Caret in FCarets do
-    if Caret.Visible then begin
-      R := CaretPointToRect(Caret.ToPoint);
+  procedure ProcessCaret(Crt: TCaretItem);
+  begin
+    if Crt.Visible then begin
+      R := CaretPointToRect(Crt.ToPoint);
       if IntersectRect(R2, R, FEditor.GetClientRect) then
         InvertRect(FEditor.GetCanvas.Handle, R);
     end;
+  end;
+
+begin
+  ProcessCaret(FCarets.DefaultCaret);
+  for Caret in FCarets do
+    ProcessCaret(Caret);
 end;
 
 
