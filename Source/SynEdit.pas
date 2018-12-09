@@ -1386,7 +1386,6 @@ begin
 //-- CodeFolding
 //++ MultiCaret
   fMultiCaretController := TMultiCaretController.Create(Self);
-  fMultiCaretController.Active := True;
 //-- MultiCaret
   SynFontChanged(nil);
 end;
@@ -1753,8 +1752,9 @@ end;
 procedure TCustomSynEdit.HideCaret;
 begin
   if sfCaretVisible in fStateFlags then
-    if Windows.HideCaret(Handle) then
-      Exclude(fStateFlags, sfCaretVisible);
+    //if Windows.HideCaret(Handle) then
+    //  Exclude(fStateFlags, sfCaretVisible);
+    fMultiCaretController.Active := False;
 end;
 
 procedure TCustomSynEdit.IncPaintLock;
@@ -2088,6 +2088,7 @@ var
 begin
   TmpBegin := FBlockBegin;
   TmpEnd := FBlockEnd;
+  CaretDisplay := DisplayXY;
 
   bWasSel := False;
   bStartDrag := False;
@@ -2179,7 +2180,6 @@ begin
   end;
 
   if (Button = mbLeft) and (ssAlt in Shift) then begin
-    CaretDisplay := DisplayXY;
     if WordWrap and (CaretDisplay.Column > CharsInWindow + 1) then
       CaretDisplay.Column := CharsInWindow + 1;
     CaretPix := RowColumnToPixels(CaretDisplay);
@@ -4691,8 +4691,9 @@ procedure TCustomSynEdit.ShowCaret;
 begin
   if not (eoNoCaret in Options) and not (sfCaretVisible in fStateFlags) then
   begin
-    if Windows.ShowCaret(Handle) then
-      Include(fStateFlags, sfCaretVisible);
+    //if Windows.ShowCaret(Handle) then
+    //  Include(fStateFlags, sfCaretVisible);
+    fMultiCaretController.Active := True
   end;
 end;
 

@@ -95,7 +95,7 @@ type
     destructor Destroy; override;
     procedure Add(APosX, APosY, ASelLen: Integer);
     procedure Assign(Other: TCarets);
-    procedure Clear(const ExcludeDefaultCaret: Boolean=True);
+    procedure Clear;
     procedure Delete(Index: Integer);
     function Count: Integer;
     function InRange(N: Integer): Boolean;
@@ -181,21 +181,15 @@ begin
   end;
 end;
 
-procedure TCarets.Clear(const ExcludeDefaultCaret: Boolean);
+procedure TCarets.Clear;
 var
   Item: TCaretItem;
 begin
-  if ExcludeDefaultCaret then begin
-    while Count > 1 do
-      Delete(1);
-  end
-  else begin
-    if Assigned(FOnBeforeClear) then
-      FOnBeforeClear(Self);
-    for Item in FList do
-      Item.Free;
-    FList.Clear;
-  end;
+  if Assigned(FOnBeforeClear) then
+    FOnBeforeClear(Self);
+  for Item in FList do
+    Item.Free;
+  FList.Clear;
   if Assigned(FOnChanged) then
     FOnChanged(Self)
 end;
@@ -232,7 +226,7 @@ end;
 
 destructor TCarets.Destroy;
 begin
-  Clear(False);
+  Clear;
   FDefaultCaret.Free;
   inherited;
 end;
@@ -468,7 +462,7 @@ begin
       InvertRects;
     FActive := Value;
     FShown := False;
-    FBlinkTimer.Enabled := Value and (FCarets.Count > 0);
+    FBlinkTimer.Enabled := Value;
   end;
 end;
 
@@ -495,7 +489,6 @@ begin
     if not Assigned(Caret.OnVisibleChanged) then
       Caret.OnVisibleChanged := DoCaretVisibleChanged;
   end;
-  FBlinkTimer.Enabled := FActive and (FCarets.Count > 0);
 end;
 
 procedure TMultiCaretController.DoCaretSelLenChanged(Sender: TCaretItem;
