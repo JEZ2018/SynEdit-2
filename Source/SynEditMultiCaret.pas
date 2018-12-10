@@ -534,6 +534,7 @@ constructor TCaretShape.Create(const aWidth, aHeight: Integer);
 begin
   Width := aWidth;
   Height := aHeight;
+  FillChar(Offset, SizeOf(Offset), 0);
 end;
 
 class operator TCaretShape.Equal(a, b: TCaretShape): Boolean;
