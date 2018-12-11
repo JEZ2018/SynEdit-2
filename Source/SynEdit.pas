@@ -8,7 +8,6 @@ Software distributed under the License is distributed on an "AS IS" basis,
 WITHOUT WARRANTY OF ANY KIND, either express or implied. See the License for
 the specific language governing rights and limitations under the License.
 
-The Original Code is: SynEdit.pas, released 2000-04-07.
 The Original Code is based on mwCustomEdit.pas by Martin Waldenburg, part of
 the mwEdit component suite.
 Portions created by Martin Waldenburg are Copyright (C) 1998 Martin Waldenburg.
@@ -28,15 +27,11 @@ replace them with the notice and other provisions required by the GPL.
 If you do not delete the provisions above, a recipient may use your version
 of this file under either the MPL or the GPL.
 
-You may retrieve the latest version of this file at the SynEdit home page,
-located at http://SynEdit.SourceForge.net
-
 Known Issues:
 - Undo is buggy when dealing with Hard Tabs (when inserting text after EOL and
   when trimming).
 
 -------------------------------------------------------------------------------}
-//todo: remove SynEdit Clipboard Format?
 //todo: in WordWrap mode, parse lines only once in PaintLines()
 //todo: Remove checks for WordWrap. Must abstract the behaviour with the plugins instead.
 //todo: Move WordWrap glyph to the WordWrap plugin.
@@ -50,6 +45,7 @@ unit SynEdit;
 interface
 
 uses
+  ActiveX,
   Controls,
   Contnrs,
   Graphics,
@@ -86,11 +82,6 @@ const
   // Max number of book/gutter marks returned from GetEditMarksForLine - that
   // really should be enough.
   MAX_MARKS = 16;
-
-  SYNEDIT_CLIPBOARD_FORMAT = 'SynEdit Control Block Type';
-
-var
-  SynEditClipboardFormat: UINT;
 
 type
   TBufferCoord = SynEditTypes.TBufferCoord;
@@ -136,7 +127,7 @@ type
 
   TSynStateFlag = (sfCaretChanged, sfScrollbarChanged, sfLinesChanging,
     sfIgnoreNextChar, sfCaretVisible, sfDblClicked, sfPossibleGutterClick,
-    sfWaitForDragging, sfInsideRedo, sfGutterDragging);
+    sfInsideRedo, sfOleDragSource);
 
   TSynStateFlags = set of TSynStateFlag;
 
@@ -593,6 +584,7 @@ type
     function DoMouseWheel(Shift: TShiftState; WheelDelta: Integer;
       MousePos: TPoint): Boolean; override;
     procedure CreateParams(var Params: TCreateParams); override;
+    procedure CreateWindowHandle(const Params: TCreateParams); override;
     procedure CreateWnd; override;
     procedure DestroyWnd; override;
     procedure InvalidateRect(const aRect: TRect; aErase: Boolean); virtual;
@@ -601,9 +593,18 @@ type
     procedure DefineProperties(Filer: TFiler); override;
     procedure DoChange; virtual;
     procedure DoKeyPressW(var Message: TWMKey);
-    procedure DragCanceled; override;
-    procedure DragOver(Source: TObject; X, Y: Integer;
-      State: TDragState; var Accept: Boolean); override;
+    //++ Ole Drag & Drop
+    procedure OleDragEnter(Sender : TObject; DataObject : IDataObject;
+      State : TShiftState; MousePt : TPoint; var Effect: LongInt;
+      var Result: HResult); virtual;
+    procedure OleDragOver(Sender : TObject; DataObject : IDataObject;
+      State : TShiftState; MousePt : TPoint; var Effect: LongInt;
+      var Result: HResult); virtual;
+    procedure OleDrop(Sender : TObject; DataObject : IDataObject;
+      State : TShiftState; MousePt : TPoint; var Effect: LongInt;
+      var Result: HResult); virtual;
+    procedure OleDragLeave(Sender : TObject; var Result : HResult); virtual;
+    //-- Ole Drag & Drop
     function GetReadOnly: boolean; virtual;
     procedure HighlighterAttrChanged(Sender: TObject);
     procedure IncPaintLock;
@@ -724,7 +725,6 @@ type
     procedure CopyToClipboard;
     procedure CutToClipboard;
     procedure DoCopyToClipboard(const SText: string);
-    procedure DragDrop(Source: TObject; X, Y: Integer); override;
     procedure EndUndoBlock;
     procedure EndUpdate;
     procedure EnsureCursorPosVisible;
@@ -1090,7 +1090,9 @@ uses
   Clipbrd,
   ShellAPI,
   SynEditWordWrap,
-  SynEditStrConst;
+  SynEditStrConst,
+  SynEditDataObject,
+  SynEditDragDrop;
 
 function CeilOfIntDiv(Dividend: Cardinal; Divisor: Word): Word;
 Var
@@ -1181,27 +1183,31 @@ procedure TCustomSynEdit.ComputeScroll(X, Y: Integer);
 //X,Y are pixel coordinates
 var
   iScrollBounds: TRect; { relative to the client area }
+  ScrollAreaSize : integer;
+const
+  ScrollAreaDefaultSize = 4;
 begin
-  { don't scroll if dragging text from other control }
-  if (not MouseCapture) and (not Dragging) then
-  begin
-    fScrollTimer.Enabled := False;
-    Exit;
-  end;
-
   iScrollBounds := Bounds(fGutterWidth, 0, fCharsInWindow * fCharWidth,
     fLinesInWindow * fTextHeight);
-  if BorderStyle = bsNone then
-    InflateRect(iScrollBounds, -2, -2);
 
-  if X < iScrollBounds.Left then
+  ScrollAreaSize := 0;
+  if sfOleDragSource in fStateFlags then
+    Inc(ScrollAreaSize, ScrollAreaDefaultSize);
+  if BorderStyle = bsNone then
+    Inc(ScrollAreaSize, 2);
+
+  InflateRect(iScrollBounds,
+    -MulDiv(ScrollAreaSize, Screen.PixelsPerInch, 96),
+    -MulDiv(ScrollAreaSize, Screen.PixelsPerInch, 96));
+
+  if (X < iScrollBounds.Left) and (LeftChar > 1) then
     fScrollDeltaX := (X - iScrollBounds.Left) div fCharWidth - 1
   else if X >= iScrollBounds.Right then
     fScrollDeltaX := (X - iScrollBounds.Right) div fCharWidth + 1
   else
     fScrollDeltaX := 0;
 
-  if Y < iScrollBounds.Top then
+  if (Y < iScrollBounds.Top) and (TopLine > 1) then
     fScrollDeltaY := (Y - iScrollBounds.Top) div fTextHeight - 1
   else if Y >= iScrollBounds.Bottom then
     fScrollDeltaY := (Y - iScrollBounds.Bottom) div fTextHeight + 1
@@ -1212,46 +1218,8 @@ begin
 end;
 
 procedure TCustomSynEdit.DoCopyToClipboard(const SText: string);
-var
-  Mem: HGLOBAL;
-  P: PByte;
-  SLen: Integer;
 begin
-  if SText = '' then Exit;
-  SetClipboardText(SText);
-  SLen := Length(SText);
-  // Open and Close are the only TClipboard methods we use because TClipboard
-  // is very hard (impossible) to work with if you want to put more than one
-  // format on it at a time.
-  Clipboard.Open;
-  try
-    // Copy it in our custom format so we know what kind of block it is.
-    // That effects how it is pasted in.
-    // This format is kept as ANSI to be compatible with programs using the
-    // ANSI version of Synedit.
-    Mem := GlobalAlloc(GMEM_MOVEABLE or GMEM_DDESHARE,
-      sizeof(TSynSelectionMode) + SLen + 1);
-    if Mem <> 0 then
-    begin
-      P := GlobalLock(Mem);
-      try
-        if P <> nil then
-        begin
-          // Our format:  TSynSelectionMode value followed by Ansi-text.
-          PSynSelectionMode(P)^ := fActiveSelectionMode;
-          inc(P, SizeOf(TSynSelectionMode));
-          Move(PAnsiChar(AnsiString(SText))^, P^, SLen + 1);
-          SetClipboardData(SynEditClipboardFormat, Mem);
-        end;
-      finally
-        GlobalUnlock(Mem);
-      end;
-    end;
-    // Don't free Mem!  It belongs to the clipboard now, and it will free it
-    // when it is done with it.
-  finally
-    Clipboard.Close;
-  end;
+  OleSetClipboard(TSynEditDataObject.Create(Self));
 end;
 
 procedure TCustomSynEdit.CopyToClipboard;
@@ -2069,14 +2037,17 @@ procedure TCustomSynEdit.MouseDown(Button: TMouseButton; Shift: TShiftState;
   X, Y: Integer);
 var
   bWasSel: Boolean;
-  bStartDrag: Boolean;
   TmpBegin, TmpEnd: TBufferCoord;
+  P : TPoint;
+  // Ole drag drop
+  DragSource : IDropSource;
+  DataObject : IDataObject;
+  dwEffect : integer;
 begin
   TmpBegin := FBlockBegin;
   TmpEnd := FBlockEnd;
 
   bWasSel := False;
-  bStartDrag := False;
   if Button = mbLeft then
   begin
     if SelAvail then
@@ -2123,36 +2094,49 @@ begin
 
     MouseCapture := True;
     //if mousedown occurred in selected block begin drag operation
-    Exclude(fStateFlags, sfWaitForDragging);
     if bWasSel and (eoDragDropEditing in fOptions) and (X >= fGutterWidth + 2)
-      and (SelectionMode = smNormal) and IsPointInSelection(DisplayToBufferPos(PixelsToRowColumn(X, Y))) then
+      and (SelectionMode = smNormal) and not (ssAlt in Shift)
+      and IsPointInSelection(DisplayToBufferPos(PixelsToRowColumn(X, Y))) then
     begin
-      bStartDrag := True
+      if DragDetect(Handle, Point(X,Y)) then begin
+        DataObject := TSynEditDataObject.Create(Self);
+        DragSource := TSynDragSource.Create;
+        try
+          Include(fStateFlags, sfOleDragSource);
+          DoDragDrop(DataObject, DragSource, DROPEFFECT_COPY or DROPEFFECT_MOVE, dwEffect);
+        finally
+          Exclude(fStateFlags, sfOleDragSource);
+          if dwEffect = DROPEFFECT_MOVE then
+            ClearSelection;
+        end;
+        Exit;
+       end else begin
+        if csLButtonDown in ControlState then
+        begin
+          GetCursorPos(P);
+          PostMessage(Handle, WM_LBUTTONUP, 0, PointToLParam(ScreenToClient(P)));
+        end;
+      end;
     end;
   end;
 
-  if (Button = mbLeft) and bStartDrag then
-    Include(fStateFlags, sfWaitForDragging)
-  else
+  if not (sfDblClicked in fStateFlags) then
   begin
-    if not (sfDblClicked in fStateFlags) then
+    if ssShift in Shift then
+      //BlockBegin and BlockEnd are restored to their original position in the
+      //code from above and SetBlockEnd will take care of proper invalidation
+      SetBlockEnd(CaretXY)
+    else
     begin
-      if ssShift in Shift then
-        //BlockBegin and BlockEnd are restored to their original position in the
-        //code from above and SetBlockEnd will take care of proper invalidation
-        SetBlockEnd(CaretXY)
-      else
+      if (eoAltSetsColumnMode in Options) and (fActiveSelectionMode <> smLine) then
       begin
-        if (eoAltSetsColumnMode in Options) and (fActiveSelectionMode <> smLine) then
-        begin
-          if ssAlt in Shift then
-            SelectionMode := smColumn
-          else
-            SelectionMode := smNormal;
-        end;
-        //Selection mode must be set before calling SetBlockBegin
-        SetBlockBegin(CaretXY);
+        if ssAlt in Shift then
+          SelectionMode := smColumn
+        else
+          SelectionMode := smNormal;
       end;
+      //Selection mode must be set before calling SetBlockBegin
+      SetBlockBegin(CaretXY);
     end;
   end;
 
@@ -2172,16 +2156,7 @@ var
   P: TDisplayCoord;
 begin
   inherited MouseMove(Shift, x, y);
-  if MouseCapture and (sfWaitForDragging in fStateFlags) then
-  begin
-    if (Abs(fMouseDownX - X) >= GetSystemMetrics(SM_CXDRAG))
-      or (Abs(fMouseDownY - Y) >= GetSystemMetrics(SM_CYDRAG)) then
-    begin
-      Exclude(fStateFlags, sfWaitForDragging);
-      BeginDrag(False);
-    end;
-  end
-  else if (ssLeft in Shift) and MouseCapture then
+  if (ssLeft in Shift) and MouseCapture then
   begin
     // should we begin scrolling?
     ComputeScroll(X, Y);
@@ -2194,8 +2169,6 @@ begin
       P.Row := DisplayY;
     InternalCaretXY := DisplayToBufferPos(P);
     BlockEnd := CaretXY;
-    if (sfPossibleGutterClick in fStateFlags) and (FBlockBegin.Line <> CaretXY.Line) then
-      Include(fStateFlags, sfGutterDragging);
   end;
 end;
 
@@ -2210,6 +2183,9 @@ begin
   iMousePos := ScreenToClient( iMousePos );
   C := PixelsToRowColumn( iMousePos.X, iMousePos.Y );
   C.Row := MinMax(C.Row, 1, DisplayLineCount);
+
+//  if (fScrollDeltaX < 0) and (LeftChar <= 1) then
+//    fScrollDeltaX := 0;
   if fScrollDeltaX <> 0 then
   begin
     LeftChar := LeftChar + fScrollDeltaX;
@@ -2229,6 +2205,7 @@ begin
       Inc(Y, LinesInWindow - 1);
     C.Row := MinMax(Y, 1, DisplayLineCount);
   end;
+
   vCaret := DisplayToBufferPos(C);
   if (CaretX <> vCaret.Char) or (CaretY <> vCaret.Line) then
   begin
@@ -2266,18 +2243,9 @@ begin
   if (sfPossibleGutterClick in fStateFlags) and (X < fGutterWidth) and (Button <> mbRight) then
   begin
     DoOnGutterClick(Button, X, Y)
-  end
-  else if fStateFlags * [sfDblClicked, sfWaitForDragging] = [sfWaitForDragging] then
-  begin
-    ComputeCaret(X, Y);
-    if not(ssShift in Shift) then
-      SetBlockBegin(CaretXY);
-    SetBlockEnd(CaretXY);
-    Exclude(fStateFlags, sfWaitForDragging);
   end;
   Exclude(fStateFlags, sfDblClicked);
   Exclude(fStateFlags, sfPossibleGutterClick);
-  Exclude(fStateFlags, sfGutterDragging);
 //++ Code Folding
   ptRowCol := PixelsToRowColumn(X, Y);
   ptLineCol := DisplayToBufferPos(ptRowCol);
@@ -4541,7 +4509,7 @@ begin
     end;
   finally
     if AddToUndoList and (Length(Value) > 0) then
-       EndUndoBlock;
+      EndUndoBlock;
   end;
 end;
 
@@ -4596,6 +4564,155 @@ begin
     end;
     OnCodeFoldingChange(Self);
     InvalidateGutter;
+  end;
+end;
+
+procedure TCustomSynEdit.OleDragEnter(Sender: TObject; DataObject: IDataObject;
+  State: TShiftState; MousePt: TPoint; var Effect: LongInt;
+  var Result: HResult);
+begin
+  if ReadOnly or not HasFormat(DataObject, CF_UNICODETEXT) then
+    Effect := DROPEFFECT_NONE;
+end;
+
+procedure TCustomSynEdit.OleDragLeave(Sender: TObject; var Result: HResult);
+begin
+  fScrollTimer.Enabled := False;
+  if sfOleDragSource in fStateFlags then //internal dragging
+    ComputeCaret(FMouseDownX, FMouseDownY);
+end;
+
+procedure TCustomSynEdit.OleDragOver(Sender: TObject; DataObject: IDataObject;
+  State: TShiftState; MousePt: TPoint; var Effect: LongInt;
+  var Result: HResult);
+var
+  vNewPos: TDisplayCoord;
+  Pt : TPoint;
+begin
+  Pt := ScreenToClient(MousePt);
+  vNewPos := PixelsToNearestRowColumn(Pt.X, Pt.Y);
+  vNewPos.Column := MinMax(vNewPos.Column, LeftChar, LeftChar + CharsInWindow - 1);
+  vNewPos.Row := MinMax(vNewPos.Row, TopLine, TopLine + LinesInWindow - 1);
+  InternalCaretXY := DisplayToBufferPos(vNewPos);
+  ComputeScroll(Pt.X, Pt.Y);
+end;
+
+procedure TCustomSynEdit.OleDrop(Sender: TObject; DataObject: IDataObject;
+  State: TShiftState; MousePt: TPoint; var Effect: LongInt;
+  var Result: HResult);
+var
+  vNewCaret: TBufferCoord;
+  DoDrop, DropAfter, DropMove: Boolean;
+  vBB, vBE: TBufferCoord;
+  DragDropText: string;
+  ChangeScrollPastEOL: Boolean;
+  FormatEtc : TFormatEtc;
+  Medium : TStgMedium;
+  Pt : TPoint;
+begin
+  Pt := ScreenToClient(MousePt);
+  DropMove := Effect = DROPEFFECT_MOVE;
+
+  IncPaintLock;
+  try
+    ComputeCaret(Pt.X, Pt.Y);
+    vNewCaret := CaretXY;
+    if not (sfOleDragSource in fStateFlags) then
+    begin
+      DoDrop := True;
+      DropAfter := False;
+    end
+    else
+    begin
+      // Internal dragging
+      vBB := BlockBegin;
+      vBE := BlockEnd;
+      DropAfter := (vNewCaret.Line > vBE.Line)
+        or ((vNewCaret.Line = vBE.Line) and ((vNewCaret.Char > vBE.Char) or
+        ((not DropMove) and (vNewCaret.Char = vBE.Char))));
+      DoDrop := DropAfter or (vNewCaret.Line < vBB.Line)
+        or ((vNewCaret.Line = vBB.Line) and ((vNewCaret.Char < vBB.Char) or
+        ((not DropMove) and (vNewCaret.Char = vBB.Char))));
+    end;
+
+    if DoDrop then begin
+      with FormatEtc do begin
+        cfFormat := CF_UNICODETEXT;
+        dwAspect := DVASPECT_CONTENT;
+        ptd := nil;
+        tymed := TYMED_HGLOBAL;
+        lindex := -1;
+      end;
+      if DataObject.GetData(FormatEtc, Medium) = S_OK then begin
+        if Medium.hGlobal <> 0 then begin
+          DragDropText := PChar(GlobalLock(Medium.hGlobal));
+          GlobalUnLock(Medium.hGlobal);
+          DoDrop := DragDropText <> '';
+        end else
+          DoDrop := False;
+        ReleaseStgMedium(Medium);
+      end else
+        DoDrop := False;
+    end;
+
+    if DoDrop then begin
+      BeginUndoBlock;
+      try
+        // delete the selected text if necessary
+        if DropMove then
+        begin
+          if sfOleDragSource in fStateFlags then begin
+            // Internal dragging
+            Effect := DROPEFFECT_NONE;  // do not clear selection after drop
+            SelText := '';
+            // adjust horizontal drop position
+            if DropAfter and (vNewCaret.Line = vBE.Line) then
+              Dec(vNewCaret.Char, vBE.Char - vBB.Char);
+            // adjust vertical drop position
+            if DropAfter and (vBE.Line > vBB.Line) then
+              Dec(vNewCaret.Line, vBE.Line - vBB.Line);
+          end;
+        end;
+        //todo: this is probably already done inside SelText
+        // insert the selected text
+        ChangeScrollPastEOL := not (eoScrollPastEol in fOptions);
+        try
+          if ChangeScrollPastEOL then
+            Include(fOptions, eoScrollPastEol);
+          InternalCaretXY := vNewCaret;
+          BlockBegin := vNewCaret;
+          { Add the text. Undo is locked so the action is recorded as crDragDropInsert
+          instead of crInsert (code right bellow). }
+          Assert(not SelAvail);
+          LockUndo;
+          try
+            SelText := DragDropText;
+          finally
+            UnlockUndo;
+          end;
+        finally
+          if ChangeScrollPastEOL then
+            Exclude(fOptions, eoScrollPastEol);
+        end;
+        // save undo information
+        if sfOleDragSource in fStateFlags then
+        begin
+          fUndoList.AddChange(crDragDropInsert, vNewCaret, BlockEnd, SelText,
+            fActiveSelectionMode);
+        end
+        else begin
+          fUndoList.AddChange(crInsert, vNewCaret, BlockEnd,
+            SelText, fActiveSelectionMode);
+        end;
+        BlockEnd := CaretXY;
+        CommandProcessor(ecSelGotoXY, #0, @vNewCaret);
+      finally
+        EndUndoBlock;
+      end;
+    end else
+      Effect := DROPEFFECT_NONE;
+  finally
+    DecPaintLock;
   end;
 end;
 
@@ -6588,145 +6705,6 @@ begin
   fChainedEditor := nil;
 
   UnHookTextBuffer;
-end;
-
-procedure TCustomSynEdit.DragCanceled;
-begin
-  fScrollTimer.Enabled := False;
-  inherited;
-end;
-
-procedure TCustomSynEdit.DragOver(Source: TObject; X, Y: Integer;
-  State: TDragState; var Accept: Boolean);
-var
-  vNewPos: TDisplayCoord;
-begin
-  inherited;
-  if (Source is TCustomSynEdit) and not ReadOnly then
-  begin
-    Accept := True;
-    //Ctrl is pressed => change cursor to indicate copy instead of move
-    if GetKeyState(VK_CONTROL) < 0 then
-      DragCursor := crMultiDrag
-    else
-      DragCursor := crDrag;
-    if Dragging then //if the drag source is the SynEdit itself
-    begin
-      if State = dsDragLeave then //restore prev caret position
-        ComputeCaret(FMouseDownX, FMouseDownY)
-      else
-      begin
-        vNewPos := PixelsToNearestRowColumn(X, Y);
-        vNewPos.Column := MinMax(vNewPos.Column, LeftChar, LeftChar + CharsInWindow - 1);
-        vNewPos.Row := MinMax(vNewPos.Row, TopLine, TopLine + LinesInWindow - 1);
-        InternalCaretXY := DisplayToBufferPos(vNewPos);
-        ComputeScroll(X, Y);
-      end;
-    end
-    else //if is dragging from another SynEdit
-      ComputeCaret(X, Y); //position caret under the mouse cursor
-  end;
-end;
-
-procedure TCustomSynEdit.DragDrop(Source: TObject; X, Y: Integer);
-var
-  vNewCaret: TBufferCoord;
-  DoDrop, DropAfter, DropMove: Boolean;
-  vBB, vBE: TBufferCoord;
-  DragDropText: string;
-  ChangeScrollPastEOL: Boolean;
-begin
-  if not ReadOnly  and (Source is TCustomSynEdit)
-    and TCustomSynEdit(Source).SelAvail then
-  begin
-    IncPaintLock;
-    try
-      inherited;
-      ComputeCaret(X, Y);
-      vNewCaret := CaretXY;
-      // if from other control then move when SHIFT, else copy
-      // if from Self then copy when CTRL, else move
-      if Source <> Self then
-      begin
-        DropMove := GetKeyState(VK_SHIFT) < 0;
-        DoDrop := True;
-        DropAfter := False;
-      end
-      else
-      begin
-        DropMove := GetKeyState(VK_CONTROL) >= 0;
-        vBB := BlockBegin;
-        vBE := BlockEnd;
-        DropAfter := (vNewCaret.Line > vBE.Line)
-          or ((vNewCaret.Line = vBE.Line) and ((vNewCaret.Char > vBE.Char) or
-          ((not DropMove) and (vNewCaret.Char = vBE.Char))));
-        DoDrop := DropAfter or (vNewCaret.Line < vBB.Line)
-          or ((vNewCaret.Line = vBB.Line) and ((vNewCaret.Char < vBB.Char) or
-          ((not DropMove) and (vNewCaret.Char = vBB.Char))));
-      end;
-      if DoDrop then begin
-        BeginUndoBlock;
-        try
-          DragDropText := TCustomSynEdit(Source).SelText;
-          // delete the selected text if necessary
-          if DropMove then
-          begin
-            if Source <> Self then
-              TCustomSynEdit(Source).SelText := ''
-            else
-            begin
-              SelText := '';
-              // adjust horizontal drop position
-              if DropAfter and (vNewCaret.Line = vBE.Line) then
-                Dec(vNewCaret.Char, vBE.Char - vBB.Char);
-              // adjust vertical drop position
-              if DropAfter and (vBE.Line > vBB.Line) then
-                Dec(vNewCaret.Line, vBE.Line - vBB.Line);
-            end;
-          end;
-          //todo: this is probably already done inside SelText
-          // insert the selected text
-          ChangeScrollPastEOL := not (eoScrollPastEol in fOptions);
-          try
-            if ChangeScrollPastEOL then
-              Include(fOptions, eoScrollPastEol);
-            InternalCaretXY := vNewCaret;
-            BlockBegin := vNewCaret;
-            { Add the text. Undo is locked so the action is recorded as crDragDropInsert
-            instead of crInsert (code right bellow). }
-            Assert(not SelAvail);
-            LockUndo;
-            try
-              SelText := DragDropText;
-            finally
-              UnlockUndo;
-            end;
-          finally
-            if ChangeScrollPastEOL then
-              Exclude(fOptions, eoScrollPastEol);
-          end;
-          // save undo information
-          if Source = Self then
-          begin
-            fUndoList.AddChange(crDragDropInsert, vNewCaret, BlockEnd, SelText,
-              fActiveSelectionMode);
-          end
-          else begin
-            fUndoList.AddChange(crInsert, vNewCaret, BlockEnd,
-              SelText, fActiveSelectionMode);
-          end;
-          BlockEnd := CaretXY;
-          CommandProcessor(ecSelGotoXY, #0, @vNewCaret);
-        finally
-          EndUndoBlock;
-        end;
-      end;
-    finally
-      DecPaintLock;
-    end;
-  end
-  else
-    inherited;
 end;
 
 procedure TCustomSynEdit.SetRightEdge(Value: Integer);
@@ -9243,6 +9221,23 @@ begin
       BufferCoord(vNewX, CaretY), Selection);
 end;
 
+procedure TCustomSynEdit.CreateWindowHandle(const Params: TCreateParams);
+Var
+  DropTarget : TSynDropTarget;
+begin
+  inherited;
+  if HandleAllocated then begin
+    DropTarget := TSynDropTarget.Create;
+    with DropTarget do begin
+      OnDragEnter := OleDragEnter;
+      OnDragOver := OleDragOver;
+      OnDragLeave := OleDragLeave;
+      OnDrop := OleDrop;
+    end;
+    RegisterDragDrop (Handle, DropTarget);
+  end;
+end;
+
 procedure TCustomSynEdit.CreateWnd;
 begin
   inherited;
@@ -11019,10 +11014,5 @@ procedure TSynEditPlugin.LinesDeleted(FirstLine, Count: Integer);
 begin
   // nothing
 end;
-
-initialization
-  SynEditClipboardFormat := RegisterClipboardFormat(SYNEDIT_CLIPBOARD_FORMAT);
-
-finalization
 
 end.
