@@ -150,6 +150,8 @@ type
     destructor Destroy; override;
     procedure Paint;
     procedure Flash;
+    procedure MoveY(Delta: Integer);
+    procedure MoveX(Delta: Integer);
     property Active: Boolean read FActive write SetActive;
     property Carets: TCarets read FCarets;
     property Shape: TCaretShape read FShape write SetShape;
@@ -412,6 +414,24 @@ begin
     ProcessCaret(Caret);
 end;
 
+
+procedure TMultiCaretController.MoveX(Delta: Integer);
+var
+  Caret: TCaretItem;
+begin
+  for Caret in FCarets do begin
+    Caret.PosX := Caret.PosX + Delta
+  end;
+end;
+
+procedure TMultiCaretController.MoveY(Delta: Integer);
+var
+  Caret: TCaretItem;
+begin
+  for Caret in FCarets do begin
+    Caret.PosY := Caret.PosY + Delta
+  end;
+end;
 
 procedure TMultiCaretController.DoBeforeCaretsClear(Sender: TObject);
 begin
