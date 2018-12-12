@@ -2253,7 +2253,8 @@ begin
   if (Button = mbRight) and (Shift = [ssRight]) and Assigned(PopupMenu) then
     exit;
   MouseCapture := False;
-  if (sfPossibleGutterClick in fStateFlags) and (X < fGutterWidth) and (Button <> mbRight) then
+  if (fStateFlags * [sfPossibleGutterClick, sfGutterDragging] = [sfPossibleGutterClick])
+    and (X < fGutterWidth) and (Button <> mbRight) then
   begin
     DoOnGutterClick(Button, X, Y)
   end;
