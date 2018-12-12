@@ -56,8 +56,9 @@ uses
   Dialogs,
   Themes,
   UITypes,
-  SynUnicode,
   Imm,
+  Diagnostics,
+  SynUnicode,
   SynTextDrawer,
   SynEditTypes,
   SynEditKeyConst,
@@ -124,7 +125,7 @@ type
   TSynEditCaretType = (ctVerticalLine, ctHorizontalLine, ctHalfBlock, ctBlock);
 
   TSynStateFlag = (sfCaretChanged, sfScrollbarChanged, sfLinesChanging,
-    sfIgnoreNextChar, sfCaretVisible, sfDblClicked, sfPossibleGutterClick,
+    sfIgnoreNextChar, sfCaretVisible, sfPossibleGutterClick,
     sfInsideRedo, sfOleDragSource);
 
   TSynStateFlags = set of TSynStateFlag;
@@ -403,6 +404,17 @@ type
     fPlugins: TObjectList;
     fScrollTimer: TTimer;
     fScrollDeltaX, fScrollDeltaY: Integer;
+    fClickCountTimer: TStopWatch;
+    fClickCount: Integer;
+    FPaintTransientLock: Integer;
+    FIsScrolling: Boolean;
+    FAdditionalWordBreakChars: TSysCharSet;
+    FAdditionalIdentChars: TSysCharSet;
+    SelStartBeforeSearch: integer;
+    SelLengthBeforeSearch: integer;
+    FWindowProducedMessage: Boolean;
+
+
     // event handlers
     fOnChange: TNotifyEvent;
     fOnClearMark: TPlaceMarkEvent;
@@ -423,12 +435,8 @@ type
     fOnGutterGetText: TGutterGetTextEvent;
     fOnGutterPaint: TGutterPaintEvent;
     fOnStatusChange: TStatusChangeEvent;
-//++ CodeFolding
-    fOnScanForFoldRanges : TScanForFoldRangesEvent;
-//-- CodeFolding
-
-    FPaintTransientLock: Integer;
-    FIsScrolling: Boolean;
+    fOnTripleClick: TNotifyEvent;
+    fOnQudrupleClick: TNotifyEvent;
 
     fChainListCleared: TNotifyEvent;
     fChainListDeleted: TStringListChangeEvent;
@@ -439,26 +447,17 @@ type
     fChainedEditor: TCustomSynEdit;
     fChainUndoAdded: TNotifyEvent;
     fChainRedoAdded: TNotifyEvent;
-
-    FAdditionalWordBreakChars: TSysCharSet;
-    FAdditionalIdentChars: TSysCharSet;
-
     fSearchNotFound: TCustomSynEditSearchNotFoundEvent;
     OnFindBeforeSearch: TNotifyEvent;
     OnReplaceBeforeSearch: TNotifyEvent;
     OnCloseBeforeSearch: TNotifyEvent;
-    SelStartBeforeSearch: integer;
-    SelLengthBeforeSearch: integer;
-
-    FWindowProducedMessage: Boolean;
-
 //++ CodeFolding
+    fOnScanForFoldRanges : TScanForFoldRangesEvent;
     procedure ReScanForFoldRanges(FromLine : Integer; ToLine : Integer);
     procedure FullFoldScan;
     procedure ScanForFoldRanges(FoldRanges: TSynFoldRanges;
       LinesToScan: TStrings; FromLine : Integer; ToLine : Integer);
 //-- CodeFolding
-
     procedure BookMarkOptionsChanged(Sender: TObject);
     procedure ComputeCaret(X, Y: Integer);
     procedure ComputeScroll(X, Y: Integer);
@@ -586,6 +585,8 @@ type
     procedure DestroyWnd; override;
     procedure InvalidateRect(const aRect: TRect; aErase: Boolean); virtual;
     procedure DblClick; override;
+    procedure TripleClick; virtual;
+    procedure QuadrupleClick; virtual;
     procedure DecPaintLock;
     procedure DefineProperties(Filer: TFiler); override;
     procedure DoChange; virtual;
@@ -961,8 +962,11 @@ type
       read fOnStatusChange write fOnStatusChange;
     property OnPaintTransient: TPaintTransient
       read fOnPaintTransient write fOnPaintTransient;
-    property OnScroll: TScrollEvent
-      read fOnScroll write fOnScroll;
+    property OnScroll: TScrollEvent read fOnScroll write fOnScroll;
+    property OnTripleClick: TNotifyEvent
+      read fOnTripleClick write fOnTripleClick;
+    property OnQuadrupleClick: TNotifyEvent
+      read fOnQudrupleClick write fOnQudrupleClick;
 //++ CodeFolding
     property OnScanForFoldRanges: TScanForFoldRangesEvent
       read fOnScanForFoldRanges write fOnScanForFoldRanges;
@@ -1069,6 +1073,8 @@ type
     property OnSpecialLineColors;
     property OnStatusChange;
     property OnPaintTransient;
+    property OnTripleClick;
+    property OnQuadrupleClick;
 //++ CodeFolding
     property OnScanForFoldRanges;
 //-- CodeFolding
@@ -1342,7 +1348,6 @@ begin
   fCodeFolding.OnChange := OnCodeFoldingChange;
   fAllFoldRanges := TSynFoldRanges.Create;
 //-- CodeFolding
-
   SynFontChanged(nil);
 end;
 
@@ -2041,6 +2046,8 @@ var
   DataObject : IDataObject;
   dwEffect : integer;
 begin
+  inherited MouseDown(Button, Shift, X, Y);
+
   TmpBegin := FBlockBegin;
   TmpEnd := FBlockEnd;
 
@@ -2048,17 +2055,25 @@ begin
   if Button = mbLeft then
   begin
     if SelAvail then
-    begin
       //remember selection state, as it will be cleared later
       bWasSel := True;
-      fMouseDownX := X;
-      fMouseDownY := Y;
-    end;
-  end;
+    if (FClickCount > 0)
+       and (Abs(fMouseDownX - X) < GetSystemMetrics(SM_CXDRAG))
+       and (Abs(fMouseDownY - Y) < GetSystemMetrics(SM_CYDRAG))
+       and (fClickCountTimer.ElapsedMilliseconds < GetDoubleClickTime )
+    then
+      Inc(fClickCount)
+    else
+      fClickCount:= 1;
+    fMouseDownX := X;
+    fMouseDownY := Y;
+    if fClickCount = 3 then TripleClick;
+    if fClickCount = 4 then QuadrupleClick;
+    fClickCountTimer := TStopWatch.StartNew;
+  end else
+    fClickCount := 0;
 
-  inherited MouseDown(Button, Shift, X, Y);
-
-  if (Button = mbLeft) and (ssDouble in Shift) then Exit;
+  if (Button = mbLeft) and (fClickCount > 1) then Exit;
 
   fKbdHandler.ExecuteMouseDown(Self, Button, Shift, X, Y);
 
@@ -2117,8 +2132,7 @@ begin
     end;
   end;
 
-  if not (sfDblClicked in fStateFlags) then
-  begin
+  if not (ssDouble in Shift) then begin
     if ssShift in Shift then
       //BlockBegin and BlockEnd are restored to their original position in the
       //code from above and SetBlockEnd will take care of proper invalidation
@@ -2241,7 +2255,6 @@ begin
   begin
     DoOnGutterClick(Button, X, Y)
   end;
-  Exclude(fStateFlags, sfDblClicked);
   Exclude(fStateFlags, sfPossibleGutterClick);
 //++ Code Folding
   ptRowCol := PixelsToRowColumn(X, Y);
@@ -5580,7 +5593,6 @@ begin
     if not (eoNoSelection in fOptions) then
       SetWordBlock(CaretXY);
     inherited;
-    Include(fStateFlags, sfDblClicked);
     MouseCapture := False;
   end
   else
@@ -6972,6 +6984,23 @@ begin
   begin
     fLastKey := 0;
     fLastShiftState := [];
+  end;
+end;
+
+procedure TCustomSynEdit.TripleClick;
+Var
+  BB, BE : TBufferCoord;
+begin
+  if Assigned(fOnTripleClick) then
+    fOnTripleClick(Self)
+  else if not (eoNoSelection in fOptions) then
+  begin
+    BB := BufferCoord(1, CaretY);
+    if CaretY < Lines.Count then
+      BE := BufferCoord(1, CaretY + 1)
+    else
+      BE := BufferCoord(Length(Lines[CaretY-1]) + 1, CaretY);
+    SetCaretAndSelection(BE, BB, BE);
   end;
 end;
 
@@ -10113,6 +10142,14 @@ begin
     Lines[ALine] := TrimTrailingSpaces(ALineText)
   else
     Lines[ALine] := ALineText;
+end;
+
+procedure TCustomSynEdit.QuadrupleClick;
+begin
+  if Assigned(fOnQudrupleClick) then
+    fOnQudrupleClick(Self)
+  else if not (eoNoSelection in fOptions) then
+    SelectAll;
 end;
 
 procedure TCustomSynEdit.AddKeyUpHandler(aHandler: TKeyEvent);
