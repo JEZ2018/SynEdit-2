@@ -126,7 +126,7 @@ type
 
   TSynStateFlag = (sfCaretChanged, sfScrollbarChanged, sfLinesChanging,
     sfIgnoreNextChar, sfCaretVisible, sfPossibleGutterClick,
-    sfInsideRedo, sfOleDragSource);
+    sfInsideRedo, sfOleDragSource, sfGutterDragging);
 
   TSynStateFlags = set of TSynStateFlag;
 
@@ -2180,6 +2180,8 @@ begin
       P.Row := DisplayY;
     InternalCaretXY := DisplayToBufferPos(P);
     BlockEnd := CaretXY;
+    if (sfPossibleGutterClick in fStateFlags) and (FBlockBegin.Line <> CaretXY.Line) then
+      Include(fStateFlags, sfGutterDragging);
   end;
 end;
 
@@ -2256,6 +2258,7 @@ begin
     DoOnGutterClick(Button, X, Y)
   end;
   Exclude(fStateFlags, sfPossibleGutterClick);
+  Exclude(fStateFlags, sfGutterDragging);
 //++ Code Folding
   ptRowCol := PixelsToRowColumn(X, Y);
   ptLineCol := DisplayToBufferPos(ptRowCol);
