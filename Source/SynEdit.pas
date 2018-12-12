@@ -35,7 +35,6 @@ Known Issues:
 //todo: in WordWrap mode, parse lines only once in PaintLines()
 //todo: Remove checks for WordWrap. Must abstract the behaviour with the plugins instead.
 //todo: Move WordWrap glyph to the WordWrap plugin.
-//todo: remove fShowSpecChar variable
 
 unit SynEdit;
 
@@ -428,7 +427,6 @@ type
     fOnScanForFoldRanges : TScanForFoldRangesEvent;
 //-- CodeFolding
 
-    fShowSpecChar: Boolean;
     FPaintTransientLock: Integer;
     FIsScrolling: Boolean;
 
@@ -2880,12 +2878,12 @@ var
     begin
       if Length(Token) >= Counter then
       begin
-        if fShowSpecChar and (Token[Counter] = #32) then
+        if (eoShowSpecialChars in fOptions) and (Token[Counter] = #32) then
           Token[Counter] := SynSpaceGlyph
         else if Token[Counter] = #9 then
         begin
           Token[Counter] := #32;  //Tabs painted differently if necessary
-          DoTabPainting := fShowSpecChar;
+          DoTabPainting := eoShowSpecialChars in fOptions;
         end;
       end;
       Dec(Counter);
@@ -3466,7 +3464,9 @@ var
             sToken := Copy(sLineExpandedAtWideGlyphs, vFirstChar, vLastChar - vFirstChar)
           else
             sToken := Copy(sLineExpandedAtWideGlyphs, 1, vLastChar);
-          if fShowSpecChar and (Length(sLineExpandedAtWideGlyphs) < vLastChar) then
+          if (eoShowSpecialChars in fOptions) and
+            (Length(sLineExpandedAtWideGlyphs) < vLastChar)
+          then
             sToken := sToken + SynLineBreakGlyph;
           nTokenLen := Length(sToken);
           if bComplexLine then
@@ -3541,7 +3541,7 @@ var
           end;
           // Draw anything that's left in the TokenAccu record. Fill to the end
           // of the invalid area with the correct colors.
-          if fShowSpecChar and fHighlighter.GetEol then
+          if (eoShowSpecialChars in fOptions) and fHighlighter.GetEol then
           begin
             if (attr = nil) or (attr <> fHighlighter.CommentAttribute) then
                attr := fHighlighter.WhitespaceAttribute;
@@ -8430,31 +8430,26 @@ const
     eoScrollPastEof,eoScrollPastEol];
 var
   bSetDrag: Boolean;
-  TmpBool: Boolean;
   bUpdateScroll: Boolean;
+  bInvalidate: Boolean;
 begin
   if (Value <> fOptions) then
   begin
     bSetDrag := (eoDropFiles in fOptions) <> (eoDropFiles in Value);
+    bInvalidate := (eoShowSpecialChars in fOptions) <> (eoShowSpecialChars in Value);
+    bUpdateScroll := (Options * ScrollOptions) <> (Value * ScrollOptions);
 
     if not (eoScrollPastEol in Options) then
       LeftChar := LeftChar;
     if not (eoScrollPastEof in Options) then
       TopLine := TopLine;
-
-    bUpdateScroll := (Options * ScrollOptions) <> (Value * ScrollOptions);
-
     fOptions := Value;
 
     // (un)register HWND as drop target
     if bSetDrag and not (csDesigning in ComponentState) and HandleAllocated then
       DragAcceptFiles(Handle, (eoDropFiles in fOptions));
-    TmpBool := eoShowSpecialChars in Value;
-    if TmpBool <> fShowSpecChar then
-    begin
-      fShowSpecChar := TmpBool;
+    if bInvalidate then
       Invalidate;
-    end;
     if bUpdateScroll then
       UpdateScrollBars;
   end;
