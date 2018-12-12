@@ -11,7 +11,7 @@ the specific language governing rights and limitations under the License.
 The Original Code is based on mwCustomEdit.pas by Martin Waldenburg, part of
 the mwEdit component suite.
 Portions created by Martin Waldenburg are Copyright (C) 1998 Martin Waldenburg.
-Unicode translation by Ma�l H�rz.
+Unicode translation by Maël Hörz.
 All Rights Reserved.
 
 Contributors to the SynEdit and mwEdit projects are listed in the
@@ -36,7 +36,6 @@ Known Issues:
 //todo: Remove checks for WordWrap. Must abstract the behaviour with the plugins instead.
 //todo: Move WordWrap glyph to the WordWrap plugin.
 //todo: remove fShowSpecChar variable
-//todo: remove the several Undo block types?
 
 unit SynEdit;
 
@@ -4370,7 +4369,7 @@ var
           // Add undo change here from PasteFromClipboard
           if AddToUndoList then
           begin
-            fUndoList.AddChange(crPaste, BufferCoord(InsertPos, CaretY),
+            fUndoList.AddChange(crInsert, BufferCoord(InsertPos, CaretY),
                BufferCoord(InsertPos + (P - Start), CaretY), '', fActiveSelectionMode);
           end;
         end;
@@ -4673,7 +4672,6 @@ begin
               Dec(vNewCaret.Line, vBE.Line - vBB.Line);
           end;
         end;
-        //todo: this is probably already done inside SelText
         // insert the selected text
         ChangeScrollPastEOL := not (eoScrollPastEol in fOptions);
         try
@@ -4681,31 +4679,13 @@ begin
             Include(fOptions, eoScrollPastEol);
           InternalCaretXY := vNewCaret;
           BlockBegin := vNewCaret;
-          { Add the text. Undo is locked so the action is recorded as crDragDropInsert
-          instead of crInsert (code right bellow). }
-          Assert(not SelAvail);
-          LockUndo;
-          try
-            SelText := DragDropText;
-          finally
-            UnlockUndo;
-          end;
+          SelText := DragDropText; // creates undo action
         finally
           if ChangeScrollPastEOL then
             Exclude(fOptions, eoScrollPastEol);
         end;
-        // save undo information
-        if sfOleDragSource in fStateFlags then
-        begin
-          fUndoList.AddChange(crDragDropInsert, vNewCaret, BlockEnd, SelText,
-            fActiveSelectionMode);
-        end
-        else begin
-          fUndoList.AddChange(crInsert, vNewCaret, BlockEnd,
-            SelText, fActiveSelectionMode);
-        end;
-        BlockEnd := CaretXY;
-        CommandProcessor(ecSelGotoXY, #0, @vNewCaret);
+        SetCaretAndSelection(CaretXY, vNewCaret, CaretXY);
+        fUndoList.AddChange(crSelection, fBlockBegin, fBlockEnd, '', ActiveSelectionMode);
       finally
         EndUndoBlock;
       end;
@@ -5665,8 +5645,7 @@ var
   FLastChange : TSynChangeReason;
   FAutoComplete: Boolean;
   FPasteAction: Boolean;
-  FSpecial1: Boolean;
-  FSpecial2: Boolean;
+  FSpecial: Boolean;
   FKeepGoing: Boolean;
 begin
   if ReadOnly then
@@ -5675,8 +5654,7 @@ begin
   FLastChange := FRedoList.LastChangeReason;
   FAutoComplete := FLastChange = crAutoCompleteBegin;
   FPasteAction := FLastChange = crPasteBegin;
-  FSpecial1 := FLastChange = crSpecial1Begin;
-  FSpecial2 := FLastChange = crSpecial2Begin;
+  FSpecial := FLastChange = crSpecialBegin;
 
   Item := fRedoList.PeekItem;
   if Item <> nil then
@@ -5695,10 +5673,8 @@ begin
              FKeepGoing:= (FRedoList.LastChangeReason <> crAutoCompleteEnd)
           else if FPasteAction then
              FKeepGoing:= (FRedoList.LastChangeReason <> crPasteEnd)
-          else if FSpecial1 then
-             FKeepGoing := (FRedoList.LastChangeReason <> crSpecial1End)
-          else if FSpecial2 then
-             FKeepGoing := (FRedoList.LastChangeReason <> crSpecial2End)
+          else if FSpecial then
+             FKeepGoing := (FRedoList.LastChangeReason <> crSpecialEnd)
           else if Item.ChangeNumber = OldChangeNumber then
              FKeepGoing := True
           else begin
@@ -5713,8 +5689,7 @@ begin
       //we need to eat the last command since it does nothing and also update modified status...
       if (FAutoComplete and (FRedoList.LastChangeReason = crAutoCompleteEnd)) or
          (FPasteAction and (FRedoList.LastChangeReason = crPasteEnd)) or
-         (FSpecial1 and (FRedoList.LastChangeReason = crSpecial1End)) or
-         (FSpecial2 and (FRedoList.LastChangeReason = crSpecial2End)) then
+         (FSpecial and (FRedoList.LastChangeReason = crSpecialEnd)) then
       begin
         RedoItem;
         UpdateModifiedStatus;
@@ -5759,7 +5734,7 @@ begin
           fUndoList.AddChange(Item.ChangeReason, BlockBegin, BlockEnd, '', fActiveSelectionMode);
           SetCaretAndSelection(CaretXY, Item.ChangeStartPos, Item.ChangeEndPos);
         end;
-      crInsert, crPaste, crDragDropInsert:
+      crInsert:
         begin
           SetCaretAndSelection(Item.ChangeStartPos, Item.ChangeStartPos,
             Item.ChangeStartPos);
@@ -5768,10 +5743,6 @@ begin
           InternalCaretXY := Item.ChangeEndPos;
           fUndoList.AddChange(Item.ChangeReason, Item.ChangeStartPos,
             Item.ChangeEndPos, SelText, Item.ChangeSelMode);
-          if Item.ChangeReason = crDragDropInsert then begin
-            SetCaretAndSelection(Item.ChangeStartPos, Item.ChangeStartPos,
-              Item.ChangeEndPos);
-          end;
         end;
       crDelete, crSilentDelete:
         begin
@@ -6214,8 +6185,7 @@ var
   FLastChange : TSynChangeReason;
   FAutoComplete: Boolean;
   FPasteAction: Boolean;
-  FSpecial1: Boolean;
-  FSpecial2: Boolean;
+  FSpecial: Boolean;
   FKeepGoing: Boolean;
 begin
   if ReadOnly then
@@ -6226,8 +6196,7 @@ begin
   FLastChange := FUndoList.LastChangeReason;
   FAutoComplete := FLastChange = crAutoCompleteEnd;
   FPasteAction := FLastChange = crPasteEnd;
-  FSpecial1 := FLastChange = crSpecial1End;
-  FSpecial2 := FLastChange = crSpecial2End;
+  FSpecial := FLastChange = crSpecialEnd;
 
   Item := fUndoList.PeekItem;
   if Item <> nil then
@@ -6247,10 +6216,8 @@ begin
              FKeepGoing := (FUndoList.LastChangeReason <> crAutoCompleteBegin)
           else if FPasteAction then
              FKeepGoing := (FUndoList.LastChangeReason <> crPasteBegin)
-          else if FSpecial1 then
-             FKeepGoing := (FUndoList.LastChangeReason <> crSpecial1Begin)
-          else if FSpecial2 then
-             FKeepGoing := (FUndoList.LastChangeReason <> crSpecial2Begin)
+          else if FSpecial then
+             FKeepGoing := (FUndoList.LastChangeReason <> crSpecialBegin)
           else if Item.ChangeNumber = OldChangeNumber then
              FKeepGoing := True
           else begin
@@ -6265,8 +6232,7 @@ begin
       //we need to eat the last command since it does nothing and also update modified status...
       if (FAutoComplete and (FUndoList.LastChangeReason = crAutoCompleteBegin)) or
          (FPasteAction and (FUndoList.LastChangeReason = crPasteBegin)) or
-         (FSpecial1 and (FUndoList.LastChangeReason = crSpecial1Begin)) or
-         (FSpecial2 and (FUndoList.LastChangeReason = crSpecial2Begin)) then
+         (FSpecial and (FUndoList.LastChangeReason = crSpecialBegin)) then
       begin
         UndoItem;
         UpdateModifiedStatus;
@@ -6305,7 +6271,7 @@ begin
           fRedoList.AddChange(Item.ChangeReason, BlockBegin, BlockEnd, '', fActiveSelectionMode);
           SetCaretAndSelection(CaretXY, Item.ChangeStartPos, Item.ChangeEndPos);
         end;
-      crInsert, crPaste, crDragDropInsert:
+      crInsert:
         begin
           SetCaretAndSelection(Item.ChangeStartPos, Item.ChangeStartPos,
             Item.ChangeEndPos);

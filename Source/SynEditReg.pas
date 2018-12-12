@@ -41,7 +41,6 @@ interface
 uses
   // SynEdit components
   SynEdit,
-  SynMemo,
   SynDBEdit,
   SynEditStrConst,
   SynEditHighlighter,
