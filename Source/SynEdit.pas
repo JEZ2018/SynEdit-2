@@ -1,4 +1,4 @@
-{-------------------------------------------------------------------------------
+﻿{-------------------------------------------------------------------------------
 The contents of this file are subject to the Mozilla Public License
 Version 1.1 (the "License"); you may not use this file except in compliance
 with the License. You may obtain a copy of the License at
@@ -379,7 +379,6 @@ type
     fMouseWheelAccumulator: Integer;
     fOverwriteCaret: TSynEditCaretType;
     fInsertCaret: TSynEditCaretType;
-    fCaretOffset: TPoint;
     fKeyStrokes: TSynEditKeyStrokes;
     fModified: Boolean;
     fMarkList: TSynEditMarkList;
@@ -663,6 +662,7 @@ type
       var Data: pointer): TSynEditorCommand;
     procedure UndoItem;
     procedure UpdateMouseCursor; virtual;
+    function DisplayCoord2CaretXY(const Coord: TDisplayCoord): TPoint;
   protected
     fGutterWidth: Integer;
     fInternalImage: TSynInternalImage;
@@ -2061,7 +2061,6 @@ var
   // Multicaret
   CaretDisplay: TDisplayCoord;
   CaretPix: TPoint;
-  CX, CY: Integer;
 begin
   inherited MouseDown(Button, Shift, X, Y);
 
@@ -2178,12 +2177,8 @@ begin
   end;
 
   if (Button = mbLeft) and (ssAlt in Shift) then begin
-    if WordWrap and (CaretDisplay.Column > CharsInWindow + 1) then
-      CaretDisplay.Column := CharsInWindow + 1;
-    CaretPix := RowColumnToPixels(CaretDisplay);
-    CX := CaretPix.X + FCaretOffset.X;
-    CY := CaretPix.Y + FCaretOffset.Y;
-    fMultiCaretController.Carets.Add(CX, CY, 0);
+    CaretPix := DisplayCoord2CaretXY(CaretDisplay);
+    fMultiCaretController.Carets.Add(CaretPix.X, CaretPix.Y, 0);
   end
   else
     fMultiCaretController.Carets.Clear;
@@ -4818,7 +4813,6 @@ procedure TCustomSynEdit.UpdateCaret;
 var
   CX, CY: Integer;
   iClientRect: TRect;
-  vCaretDisplay: TDisplayCoord;
   vCaretPix: TPoint;
   cf: TCompositionForm;
 begin
@@ -4827,14 +4821,12 @@ begin
   else
   begin
     Exclude(fStateFlags, sfCaretChanged);
-    vCaretDisplay := DisplayXY;
-    if WordWrap and (vCaretDisplay.Column > CharsInWindow + 1) then
-      vCaretDisplay.Column := CharsInWindow + 1;
-    vCaretPix := RowColumnToPixels(vCaretDisplay);
-    CX := vCaretPix.X + FCaretOffset.X;
-    CY := vCaretPix.Y + FCaretOffset.Y;
+    vCaretPix := DisplayCoord2CaretXY(DisplayXY);
+    CX := vCaretPix.X;
+    CY := vCaretPix.Y;
     iClientRect := GetClientRect;
     Inc(iClientRect.Left, fGutterWidth);
+
     if (CX >= iClientRect.Left) and (CX < iClientRect.Right)
       and (CY >= iClientRect.Top) and (CY < iClientRect.Bottom) then
     begin
@@ -6873,6 +6865,7 @@ procedure TCustomSynEdit.InitializeCaret;
 var
   ct: TSynEditCaretType;
   cw, ch: Integer;
+  CaretOffset: TPoint;
 begin
   // CreateCaret automatically destroys the previous one, so we don't have to
   // worry about cleaning up the old one here with DestroyCaret.
@@ -6886,25 +6879,25 @@ begin
       begin
         cw := fCharWidth;
         ch := 2;
-        FCaretOffset := Point(0, fTextHeight - 2);
+        CaretOffset := Point(0, fTextHeight - 2);
       end;
     ctHalfBlock:
       begin
         cw := fCharWidth;
         ch := (fTextHeight - 2) div 2;
-        FCaretOffset := Point(0, ch);
+        CaretOffset := Point(0, ch);
       end;
     ctBlock:
       begin
         cw := fCharWidth;
         ch := fTextHeight - 2;
-        FCaretOffset := Point(0, 0);
+        CaretOffset := Point(0, 0);
       end;
     else
     begin // ctVerticalLine
       cw := 2;
       ch := fTextHeight - 2;
-      FCaretOffset := Point(-1, 0);
+      CaretOffset := Point(-1, 0);
     end;
   end;
   Exclude(fStateFlags, sfCaretVisible);
@@ -6913,7 +6906,7 @@ begin
     CreateCaret(Handle, 0, cw, ch);
     UpdateCaret;
   end;
-  fMultiCaretController.Shape := TCaretShape.Create(cw, ch);
+  fMultiCaretController.Shape := TCaretShape.Create(cw, ch, CaretOffset);
 end;
 
 procedure TCustomSynEdit.SetInsertCaret(const Value: TSynEditCaretType);
@@ -10101,6 +10094,21 @@ begin
   if UseCodeFolding then
     Result.Row := fAllFoldRanges.FoldLineToRow(Result.Row)
 //-- CodeFolding
+end;
+
+function TCustomSynEdit.DisplayCoord2CaretXY(
+  const Coord: TDisplayCoord): TPoint;
+var
+  vCaretDisplay: TDisplayCoord;
+  vCaretPix: TPoint;
+
+begin
+  vCaretDisplay := Coord;
+  if WordWrap and (vCaretDisplay.Column > CharsInWindow + 1) then
+    vCaretDisplay.Column := CharsInWindow + 1;
+  vCaretPix := RowColumnToPixels(vCaretDisplay);
+  Result.X := vCaretPix.X;
+  Result.Y := vCaretPix.Y;
 end;
 
 function TCustomSynEdit.DisplayToBufferPos(const p: TDisplayCoord): TBufferCoord;
