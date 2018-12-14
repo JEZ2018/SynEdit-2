@@ -28,11 +28,6 @@ replace them with the notice and other provisions required by the GPL.
 If you do not delete the provisions above, a recipient may use your version
 of this file under either the MPL or the GPL.
 
-$Id: SynEditTextBuffer.pas,v 1.14 2011/12/28 09:24:20 Egg Exp $
-
-You may retrieve the latest version of this file at the SynEdit home page,
-located at http://SynEdit.SourceForge.net
-
 Known Issues:
 -------------------------------------------------------------------------------}
 //todo: Avoid calculating expanded string unncessarily (just calculate expandedLength instead).
@@ -170,15 +165,14 @@ type
 
   ESynEditStringList = class(Exception);
 
-  TSynChangeReason = (crInsert, crPaste, crDragDropInsert,
-    // Note: several undo entries can be chained together via the ChangeNumber
-    // see also TCustomSynEdit.[Begin|End]UndoBlock methods
+  // Note: several undo entries can be chained together via the ChangeNumber
+  // see also TCustomSynEdit.[Begin|End]UndoBlock methods
+  TSynChangeReason = (crInsert,
     crDelete, crSilentDelete,
     crLineBreak, crIndent, crUnindent,
     crAutoCompleteBegin, crAutoCompleteEnd,
     crPasteBegin, crPasteEnd, // for pasting, since it might do a lot of operations
-    crSpecial1Begin, crSpecial1End,
-    crSpecial2Begin, crSpecial2End,
+    crSpecialBegin, crSpecialEnd,
     crCaret,      // just restore the Caret, allowing better Undo behavior
     crSelection,  // restore Selection
     crNothing,    // can be used to break group undo
