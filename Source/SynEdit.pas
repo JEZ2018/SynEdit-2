@@ -568,6 +568,7 @@ type
     procedure FindDialogFind(Sender: TObject);
     function SearchByFindDialog(FindDialog: TFindDialog) : bool;
     procedure FindDialogClose(Sender: TObject);
+    procedure DoMouseSelectLineRange(var NewPos: TBufferCoord);
 //++ CodeFolding
     procedure SetUseCodeFolding(const Value: Boolean);
     procedure OnCodeFoldingChange(Sender: TObject);
@@ -2052,7 +2053,7 @@ begin
   TmpEnd := FBlockEnd;
 
   bWasSel := False;
-  if Button = mbLeft then
+  if (Button = mbLeft) and ((Shift + [ssDouble]) = [ssLeft, ssDouble]) then
   begin
     if SelAvail then
       //remember selection state, as it will be cleared later
@@ -2165,6 +2166,7 @@ end;
 procedure TCustomSynEdit.MouseMove(Shift: TShiftState; X, Y: Integer);
 var
   P: TDisplayCoord;
+  BC: TBufferCoord;
 begin
   inherited MouseMove(Shift, x, y);
   if (ssLeft in Shift) and MouseCapture then
@@ -2174,12 +2176,22 @@ begin
     { compute new caret }
     P := PixelsToNearestRowColumn(X, Y);
     P.Row := MinMax(P.Row, 1, DisplayLineCount);
-    if fScrollDeltaX <> 0 then
-      P.Column := DisplayX;
-    if fScrollDeltaY <> 0 then
-      P.Row := DisplayY;
-    InternalCaretXY := DisplayToBufferPos(P);
-    BlockEnd := CaretXY;
+//  Not sure what was the purpose of these
+//    if fScrollDeltaX <> 0 then
+//      P.Column := DisplayX;
+//    if fScrollDeltaY <> 0 then
+//      P.Row := DisplayY;
+    BC := DisplayToBufferPos(P);
+
+    if BC = CaretXY then Exit;  // no movement
+
+    if (ActiveSelectionMode = smNormal) and (fClickCount = 3) then
+      DoMouseSelectLineRange(BC)
+    else begin
+      InternalCaretXY := BC;
+      BlockEnd := BC;
+    end;
+
     if (sfPossibleGutterClick in fStateFlags) and (FBlockBegin.Line <> CaretXY.Line) then
       Include(fStateFlags, sfGutterDragging);
   end;
@@ -2197,8 +2209,6 @@ begin
   C := PixelsToRowColumn( iMousePos.X, iMousePos.Y );
   C.Row := MinMax(C.Row, 1, DisplayLineCount);
 
-//  if (fScrollDeltaX < 0) and (LeftChar <= 1) then
-//    fScrollDeltaX := 0;
   if fScrollDeltaX <> 0 then
   begin
     LeftChar := LeftChar + fScrollDeltaX;
@@ -2220,15 +2230,19 @@ begin
   end;
 
   vCaret := DisplayToBufferPos(C);
-  if (CaretX <> vCaret.Char) or (CaretY <> vCaret.Line) then
+  if ((CaretX <> vCaret.Char) or (CaretY <> vCaret.Line)) then
   begin
     // changes to line / column in one go
     IncPaintLock;
     try
-      InternalCaretXY := vCaret;
-      // if MouseCapture is True we're changing selection. otherwise we're dragging
-      if MouseCapture then
-        SetBlockEnd(CaretXY);
+      if (fClickCount = 3) and (ActiveSelectionMode = smNormal) then
+        DoMouseSelectLineRange(vCaret)
+      else begin
+        InternalCaretXY := vCaret;
+        // if MouseCapture is True we're changing selection. otherwise we're dragging
+        if MouseCapture then
+          SetBlockEnd(CaretXY);
+      end;
     finally
       DecPaintLock;
     end;
@@ -6002,6 +6016,48 @@ begin
   EnsureCursorPosVisible;
 end;
 
+procedure TCustomSynEdit.DoMouseSelectLineRange(var NewPos: TBufferCoord);
+var
+  BB: TBufferCoord;
+  BE: TBufferCoord;
+begin
+  // Select whole lines
+  BB := BlockBegin;
+  BE := BlockEnd;
+  //  Set AnchorLine
+  if CaretXY >= BE then
+  begin
+    if BB.Line < Lines.Count then
+      BE := BufferCoord(1, BB.Line + 1)
+    else
+      BE := BufferCoord(Length(Lines[BE.Line - 1]), BE.Line);
+  end
+  else
+  begin
+    BB := BufferCoord(1, Max(1, IfThen(BE.Line < Lines.Count, BE.Line - 1, BE.Line)));
+  end;
+  if NewPos.Line < BB.Line then
+  begin
+    BB := BufferCoord(1, NewPos.Line);
+    NewPos := BB;
+  end
+  else if NewPos.Line >= BE.Line then
+  begin
+    if NewPos.Line < Lines.Count then
+      BE := BufferCoord(1, NewPos.Line + 1)
+    else
+      BE := BufferCoord(Length(Lines[NewPos.Line - 1]), NewPos.Line);
+    NewPos := BE;
+  end
+  else
+    NewPos := BE;
+  InternalCaretXY := NewPos;
+  if BB <> fBlockBegin then
+    BlockBegin := BB;
+  if BE <> fBlockEnd then
+    BlockEnd := BE;
+end;
+
 procedure TCustomSynEdit.ExecCmdCopyOrMoveLine(Command: TSynEditorCommand);
 var
   vCaretRow, SelShift: Integer;
@@ -6995,9 +7051,7 @@ procedure TCustomSynEdit.TripleClick;
 Var
   BB, BE : TBufferCoord;
 begin
-  if Assigned(fOnTripleClick) then
-    fOnTripleClick(Self)
-  else if not (eoNoSelection in fOptions) then
+  if not (eoNoSelection in fOptions) then
   begin
     BB := BufferCoord(1, CaretY);
     if CaretY < Lines.Count then
@@ -7006,6 +7060,8 @@ begin
       BE := BufferCoord(Length(Lines[CaretY-1]) + 1, CaretY);
     SetCaretAndSelection(BE, BB, BE);
   end;
+  if Assigned(fOnTripleClick) then
+    fOnTripleClick(Self);
 end;
 
 procedure TCustomSynEdit.CommandProcessor(Command: TSynEditorCommand;
@@ -10039,7 +10095,10 @@ begin
         inc(x, TabWidth - (x mod TabWidth))
       else if i <= l then
       begin
-        CountOfAvgGlyphs := CeilOfIntDiv(fTextDrawer.TextWidth(s[i]) , fCharWidth);
+        if Ord(S[i]) <= $00FF then
+          CountOfAvgGlyphs := 1
+        else
+          CountOfAvgGlyphs := CeilOfIntDiv(fTextDrawer.TextWidth(s[i]) , fCharWidth);
         inc(x, CountOfAvgGlyphs);
       end
       else
@@ -10088,7 +10147,10 @@ begin
         inc(x, TabWidth - (x mod TabWidth))
       else if i <= l then
       begin
-        CountOfAvgGlyphs := CeilOfIntDiv(fTextDrawer.TextWidth(s[i]) , fCharWidth);
+        if Ord(s[i]) <= $00FF then
+          CountOfAvgGlyphs := 1
+        else
+          CountOfAvgGlyphs := CeilOfIntDiv(fTextDrawer.TextWidth(s[i]) , fCharWidth);
         inc(x, CountOfAvgGlyphs);
       end
       else
@@ -10150,10 +10212,10 @@ end;
 
 procedure TCustomSynEdit.QuadrupleClick;
 begin
-  if Assigned(fOnQudrupleClick) then
-    fOnQudrupleClick(Self)
-  else if not (eoNoSelection in fOptions) then
+  if not (eoNoSelection in fOptions) then
     SelectAll;
+  if Assigned(fOnQudrupleClick) then
+    fOnQudrupleClick(Self);
 end;
 
 procedure TCustomSynEdit.AddKeyUpHandler(aHandler: TKeyEvent);

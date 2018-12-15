@@ -78,8 +78,11 @@ type
     Char: integer;
     Line: integer;
     class operator Equal(a, b: TBufferCoord): Boolean;
+    class operator NotEqual(a, b: TBufferCoord): Boolean;
     class operator LessThan(a, b: TBufferCoord): Boolean;
-    class operator GreaterThan (a, b: TBufferCoord): Boolean;
+    class operator LessThanOrEqual(a, b: TBufferCoord): Boolean;
+    class operator GreaterThan(a, b: TBufferCoord): Boolean;
+    class operator GreaterThanOrEqual(a, b: TBufferCoord): Boolean;
     class function Min(a, b: TBufferCoord): TBufferCoord; static;
     class function Max(a, b: TBufferCoord): TBufferCoord; static;
   end;
@@ -88,8 +91,11 @@ type
     Column: integer;
     Row: integer;
     class operator Equal(a, b: TDisplayCoord): Boolean;
+    class operator NotEqual(a, b: TDisplayCoord): Boolean;
     class operator LessThan(a, b: TDisplayCoord): Boolean;
-    class operator GreaterThan (a, b: TDisplayCoord): Boolean;
+    class operator LessThanOrEqual(a, b: TDisplayCoord): Boolean;
+    class operator GreaterThan(a, b: TDisplayCoord): Boolean;
+    class operator GreaterThanOrEqual(a, b: TDisplayCoord): Boolean;
     class function Min(a, b: TDisplayCoord): TDisplayCoord; static;
     class function Max(a, b: TDisplayCoord): TDisplayCoord; static;
   end;
@@ -124,10 +130,22 @@ begin
     or ((b.Line = a.Line) and (b.Char < a.Char))
 end;
 
+class operator TBufferCoord.GreaterThanOrEqual(a, b: TBufferCoord): Boolean;
+begin
+  Result :=  (b.Line < a.Line)
+    or ((b.Line = a.Line) and (b.Char <= a.Char))
+end;
+
 class operator TBufferCoord.LessThan(a, b: TBufferCoord): Boolean;
 begin
   Result :=  (b.Line > a.Line)
     or ((b.Line = a.Line) and (b.Char > a.Char))
+end;
+
+class operator TBufferCoord.LessThanOrEqual(a, b: TBufferCoord): Boolean;
+begin
+  Result :=  (b.Line > a.Line)
+    or ((b.Line = a.Line) and (b.Char >= a.Char))
 end;
 
 class function TBufferCoord.Max(a, b: TBufferCoord): TBufferCoord;
@@ -150,6 +168,11 @@ begin
     Result := a;
 end;
 
+class operator TBufferCoord.NotEqual(a, b: TBufferCoord): Boolean;
+begin
+  Result := (a.Char <> b.Char) or (a.Line <> b.Line);
+end;
+
 { TDisplayCoord }
 
 class operator TDisplayCoord.Equal(a, b: TDisplayCoord): Boolean;
@@ -163,10 +186,22 @@ begin
     or ((b.Row = a.Row) and (b.Column < a.Column))
 end;
 
+class operator TDisplayCoord.GreaterThanOrEqual(a, b: TDisplayCoord): Boolean;
+begin
+  Result :=  (b.Row < a.Row)
+    or ((b.Row = a.Row) and (b.Column <= a.Column))
+end;
+
 class operator TDisplayCoord.LessThan(a, b: TDisplayCoord): Boolean;
 begin
   Result :=  (b.Row > a.Row)
     or ((b.Row = a.Row) and (b.Column > a.Column))
+end;
+
+class operator TDisplayCoord.LessThanOrEqual(a, b: TDisplayCoord): Boolean;
+begin
+  Result :=  (b.Row > a.Row)
+    or ((b.Row = a.Row) and (b.Column >= a.Column))
 end;
 
 class function TDisplayCoord.Max(a, b: TDisplayCoord): TDisplayCoord;
@@ -187,6 +222,11 @@ begin
     Result := b
   else
     Result := a;
+end;
+
+class operator TDisplayCoord.NotEqual(a, b: TDisplayCoord): Boolean;
+begin
+  Result := (a.Row <> b.Row) or (a.Column <> b.Column);
 end;
 
 end.

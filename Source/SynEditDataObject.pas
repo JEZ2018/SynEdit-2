@@ -146,7 +146,8 @@ begin
   FFormatEtc.Add(CF_UNICODETEXT);
   FFormatEtc.Add(SynEditClipboardFormat); // InternalFormat
   fText := (ASynEdit as TCustomSynEdit).SelText;
-  MemoryStream.WriteData((ASynEdit as TCustomSynEdit).ActiveSelectionMode);
+  MemoryStream.Write((ASynEdit as TCustomSynEdit).ActiveSelectionMode,
+    SizeOf(TCustomSynEdit(ASynEdit).ActiveSelectionMode));
 end;
 
 destructor TSynEditDataObject.Destroy;
