@@ -568,7 +568,8 @@ type
     procedure FindDialogFind(Sender: TObject);
     function SearchByFindDialog(FindDialog: TFindDialog) : bool;
     procedure FindDialogClose(Sender: TObject);
-    procedure DoMouseSelectLineRange(var NewPos: TBufferCoord);
+    procedure DoMouseSelectLineRange(NewPos: TBufferCoord);
+    procedure DoMouseSelectWordRange(NewPos: TBufferCoord);
 //++ CodeFolding
     procedure SetUseCodeFolding(const Value: Boolean);
     procedure OnCodeFoldingChange(Sender: TObject);
@@ -2185,7 +2186,9 @@ begin
 
     if BC = CaretXY then Exit;  // no movement
 
-    if (ActiveSelectionMode = smNormal) and (fClickCount = 3) then
+    if (ActiveSelectionMode = smNormal) and (fClickCount = 2) then
+      DoMouseSelectWordRange(BC)
+    else if (ActiveSelectionMode = smNormal) and (fClickCount = 3) then
       DoMouseSelectLineRange(BC)
     else begin
       InternalCaretXY := BC;
@@ -2235,7 +2238,11 @@ begin
     // changes to line / column in one go
     IncPaintLock;
     try
-      if (fClickCount = 3) and (ActiveSelectionMode = smNormal) then
+      if MouseCapture and (fClickCount = 2) and (ActiveSelectionMode = smNormal) then
+        // Line selection
+        DoMouseSelectWordRange(vCaret)
+      else if MouseCapture and (fClickCount = 3) and (ActiveSelectionMode = smNormal) then
+        // Line selection
         DoMouseSelectLineRange(vCaret)
       else begin
         InternalCaretXY := vCaret;
@@ -5611,7 +5618,6 @@ begin
     if not (eoNoSelection in fOptions) then
       SetWordBlock(CaretXY);
     inherited;
-    MouseCapture := False;
   end
   else
     inherited;
@@ -6016,12 +6022,11 @@ begin
   EnsureCursorPosVisible;
 end;
 
-procedure TCustomSynEdit.DoMouseSelectLineRange(var NewPos: TBufferCoord);
+procedure TCustomSynEdit.DoMouseSelectLineRange(NewPos: TBufferCoord);
+{ Select whole lines }
 var
-  BB: TBufferCoord;
-  BE: TBufferCoord;
+  BB, BE: TBufferCoord;
 begin
-  // Select whole lines
   BB := BlockBegin;
   BE := BlockEnd;
   //  Set AnchorLine
@@ -6030,7 +6035,7 @@ begin
     if BB.Line < Lines.Count then
       BE := BufferCoord(1, BB.Line + 1)
     else
-      BE := BufferCoord(Length(Lines[BE.Line - 1]), BE.Line);
+      BE := BufferCoord(Length(Lines[BB.Line - 1]), BB.Line);
   end
   else
   begin
@@ -6056,6 +6061,37 @@ begin
     BlockBegin := BB;
   if BE <> fBlockEnd then
     BlockEnd := BE;
+end;
+
+procedure TCustomSynEdit.DoMouseSelectWordRange(NewPos: TBufferCoord);
+{ Select whole words }
+var
+  BB, BE: TBufferCoord;
+begin
+  //  Set Anchor Selection (Word)
+  BB := BlockBegin;
+  BE := BlockEnd;
+  if CaretXY > BB then
+    BE := WordEndEx(BB)
+  else
+    BB := WordStartEx(BE);
+
+  if NewPos > BE then begin
+    BE := NewPos;
+    if (BE.Char > 1) and IsIdentChar(Lines[BE.Line-1][BE.Char - 1]) then
+      BE := WordEndEx(BE);
+  end else if NewPos < BB then begin
+    BB := BE;
+    BE := NewPos;
+    if (BE.Char < Lines[BE.Line-1].Length) and IsIdentChar(Lines[BE.Line-1][BE.Char]) then
+      BE := WordStartEx(BE);
+  end;
+
+  if BB <> fBlockBegin then
+    BlockBegin := BB;
+  if BE <> fBlockEnd then
+    BlockEnd := BE;
+  InternalCaretXY := fBlockEnd;
 end;
 
 procedure TCustomSynEdit.ExecCmdCopyOrMoveLine(Command: TSynEditorCommand);
