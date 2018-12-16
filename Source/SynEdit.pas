@@ -5049,6 +5049,12 @@ end;
 
 procedure TCustomSynEdit.WMDestroy(var Message: TWMDestroy);
 begin
+  // See https://en.delphipraxis.net/topic/456-destroywnd-not-called-at-destruction-of-wincontrols/
+  if (eoDropFiles in fOptions) and not (csDesigning in ComponentState) then
+    DragAcceptFiles(Handle, False);
+
+   RevokeDragDrop(Handle);
+
   // assign WindowText here, otherwise the VCL will call GetText twice
   if WindowText = nil then
      WindowText := Lines.GetText;
@@ -5072,16 +5078,7 @@ end;
 
 procedure TCustomSynEdit.WMGetText(var Msg: TWMGetText);
 begin
-  if HandleAllocated and IsWindowUnicode(Handle) then
-  begin
-    WStrLCopy(PWideChar(Msg.Text), PWideChar(Text), Msg.TextMax - 1);
-    Msg.Result := Length(PWideChar(Msg.Text));
-  end
-  else
-  begin
-   AnsiStrings.StrLCopy(PAnsiChar(Msg.Text), PAnsiChar(AnsiString(Text)), Msg.TextMax - 1);
-    Msg.Result := AnsiStrings.StrLen(PAnsiChar(Msg.Text));
-  end;
+  Msg.Result := StrLen(StrLCopy(PChar(Msg.Text), PChar(Text), Msg.TextMax - 1));
 end;
 
 procedure TCustomSynEdit.WMGetTextLength(var Msg: TWMGetTextLength);
@@ -9337,9 +9334,6 @@ end;
 
 procedure TCustomSynEdit.DestroyWnd;
 begin
-  if (eoDropFiles in fOptions) and not (csDesigning in ComponentState) then
-    DragAcceptFiles(Handle, False);
-
   // assign WindowText here, otherwise the VCL will call GetText twice
   if WindowText = nil then
      WindowText := Lines.GetText;
