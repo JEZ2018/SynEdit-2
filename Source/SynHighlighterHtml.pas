@@ -49,7 +49,6 @@ interface
 {$I SynEdit.inc}
 
 uses
-  WideStrUtils,
   Graphics,
   SynEditTypes,
   SynEditHighlighter,

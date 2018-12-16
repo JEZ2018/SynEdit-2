@@ -69,7 +69,6 @@ uses
   SynEditHighlighter,
   SynEditKbdHandler,
   SynEditCodeFolding,
-  WideStrUtils,
   Math,
   SysUtils,
   Classes;
@@ -1531,7 +1530,7 @@ function TCustomSynEdit.GetSelText: string;
     else begin
       SetLength(Result, DstLen);
       P := PWideChar(Result);
-      WStrCopy(P, PWideChar(Copy(S, Index, Count)));
+      StrCopy(P, PWideChar(Copy(S, Index, Count)));
       Inc(P, Length(S));
       for i := 0 to DstLen - Srclen - 1 do
         P[i] := #32;
@@ -9394,10 +9393,10 @@ begin
     end;
     for i := BB.Line to e-1 do
     begin
-      WStrCopy(Run, PWideChar(Spaces + #13#10));
+      StrCopy(Run, PWideChar(Spaces + #13#10));
       Inc(Run, Length(spaces) + 2);
     end;
-    WStrCopy(Run, PWideChar(Spaces));
+    StrCopy(Run, PWideChar(Spaces));
 
     fUndoList.BeginBlock;
     try
@@ -9422,7 +9421,7 @@ begin
   finally
     if BE.Char > 1 then
       Inc(BE.Char, Length(Spaces));
-    WStrDispose(StrToInsert);
+    StrDispose(StrToInsert);
     SetCaretAndSelection(OrgCaretPos,
       BufferCoord(BB.Char + Length(Spaces), BB.Line), BE);
     ActiveSelectionMode := OrgSelectionMode;
@@ -9501,8 +9500,8 @@ begin
        //Instead of doing a UnicodeStringOfChar, we need to get *exactly* what was
        //being deleted incase there is a TabChar
        TmpDelLen := GetDelLen;
-       WStrCat(StrToDelete, PWideChar(Copy(Line, 1, TmpDelLen)));
-       WStrCat(StrToDelete, PWideChar(string(#13#10)));
+       StrCat(StrToDelete, PWideChar(Copy(Line, 1, TmpDelLen)));
+       StrCat(StrToDelete, PWideChar(string(#13#10)));
        if (fCaretY = i) and (x <> 1) then
          x := x - TmpDelLen;
     end;
@@ -9510,7 +9509,7 @@ begin
     if fActiveSelectionMode = smColumn then
       Inc(Line, MinIntValue([BB.Char - 1, BE.Char - 1, Length(Lines[e - 1])]));
     TmpDelLen := GetDelLen;
-    WStrCat(StrToDelete, PWideChar(Copy(Line, 1, TmpDelLen)));
+    StrCat(StrToDelete, PWideChar(Copy(Line, 1, TmpDelLen)));
     if (fCaretY = e) and (x <> 1) then
       x := x - TmpDelLen;
 
@@ -9566,9 +9565,9 @@ begin
     end;
     ActiveSelectionMode := OrgSelectionMode;
     if FullStrToDelete <> nil then
-      WStrDispose(FullStrToDelete)
+      StrDispose(FullStrToDelete)
     else
-      WStrDispose(StrToDelete);
+      StrDispose(StrToDelete);
   end;
 end;
 
