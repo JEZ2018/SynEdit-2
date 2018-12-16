@@ -6076,6 +6076,7 @@ begin
   else
     BB := WordStartEx(BE);
 
+  NewPos.Char := Min(NewPos.Char, Lines[NewPos.Line-1].Length + 1);
   if NewPos > BE then begin
     BE := NewPos;
     if (BE.Char > 1) and IsIdentChar(Lines[BE.Line-1][BE.Char - 1]) then
