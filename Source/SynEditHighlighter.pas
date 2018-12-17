@@ -259,7 +259,6 @@ implementation
 
 uses
   SynEditMiscProcs,
-  WideStrUtils,
   SynEditStrConst;
 
 { THighlighterList }
@@ -984,7 +983,7 @@ begin
   Len := ExpandedRun - fExpandedTokenPos;
   SetLength(Result, Len);
   if Len > 0 then
-    WStrLCopy(@Result[1], fExpandedLine + fExpandedTokenPos, Len);
+    StrLCopy(@Result[1], fExpandedLine + fExpandedTokenPos, Len);
 end;
 
 class function TSynCustomHighlighter.GetFriendlyLanguageName: string;
@@ -1025,7 +1024,7 @@ begin
   Len := Run - fTokenPos;
   SetLength(Result, Len);
   if Len > 0 then
-    WStrLCopy(@Result[1], fCasedLine + fTokenPos, Len);
+    StrLCopy(@Result[1], fCasedLine + fTokenPos, Len);
 end;
 
 function TSynCustomHighlighter.GetTokenPos: Integer;

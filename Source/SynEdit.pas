@@ -70,7 +70,6 @@ uses
   SynEditKbdHandler,
   SynEditCodeFolding,
   SynEditMultiCaret,
-  WideStrUtils,
   Math,
   SysUtils,
   Classes;
@@ -415,8 +414,6 @@ type
     FAdditionalIdentChars: TSysCharSet;
     SelStartBeforeSearch: integer;
     SelLengthBeforeSearch: integer;
-    FWindowProducedMessage: Boolean;
-
 
     // event handlers
     fOnChange: TNotifyEvent;
@@ -571,6 +568,8 @@ type
     procedure FindDialogFind(Sender: TObject);
     function SearchByFindDialog(FindDialog: TFindDialog) : bool;
     procedure FindDialogClose(Sender: TObject);
+    procedure DoMouseSelectLineRange(NewPos: TBufferCoord);
+    procedure DoMouseSelectWordRange(NewPos: TBufferCoord);
 //++ CodeFolding
     procedure SetUseCodeFolding(const Value: Boolean);
     procedure OnCodeFoldingChange(Sender: TObject);
@@ -583,9 +582,7 @@ type
     function DoMouseWheel(Shift: TShiftState; WheelDelta: Integer;
       MousePos: TPoint): Boolean; override;
     procedure CreateParams(var Params: TCreateParams); override;
-    procedure CreateWindowHandle(const Params: TCreateParams); override;
     procedure CreateWnd; override;
-    procedure DestroyWnd; override;
     procedure InvalidateRect(const aRect: TRect; aErase: Boolean); virtual;
     procedure DblClick; override;
     procedure TripleClick; virtual;
@@ -1539,7 +1536,7 @@ function TCustomSynEdit.GetSelText: string;
     else begin
       SetLength(Result, DstLen);
       P := PWideChar(Result);
-      WStrCopy(P, PWideChar(Copy(S, Index, Count)));
+      StrCopy(P, PWideChar(Copy(S, Index, Count)));
       Inc(P, Length(S));
       for i := 0 to DstLen - Srclen - 1 do
         P[i] := #32;
@@ -2069,7 +2066,7 @@ begin
   CaretDisplay := DisplayXY;
 
   bWasSel := False;
-  if Button = mbLeft then
+  if (Button = mbLeft) and ((Shift + [ssDouble]) = [ssLeft, ssDouble]) then
   begin
     if SelAvail then
       //remember selection state, as it will be cleared later
@@ -2191,6 +2188,7 @@ end;
 procedure TCustomSynEdit.MouseMove(Shift: TShiftState; X, Y: Integer);
 var
   P: TDisplayCoord;
+  BC: TBufferCoord;
 begin
   inherited MouseMove(Shift, x, y);
   if (ssLeft in Shift) and MouseCapture then
@@ -2200,12 +2198,24 @@ begin
     { compute new caret }
     P := PixelsToNearestRowColumn(X, Y);
     P.Row := MinMax(P.Row, 1, DisplayLineCount);
-    if fScrollDeltaX <> 0 then
-      P.Column := DisplayX;
-    if fScrollDeltaY <> 0 then
-      P.Row := DisplayY;
-    InternalCaretXY := DisplayToBufferPos(P);
-    BlockEnd := CaretXY;
+//  Not sure what was the purpose of these
+//    if fScrollDeltaX <> 0 then
+//      P.Column := DisplayX;
+//    if fScrollDeltaY <> 0 then
+//      P.Row := DisplayY;
+    BC := DisplayToBufferPos(P);
+
+    if BC = CaretXY then Exit;  // no movement
+
+    if (ActiveSelectionMode = smNormal) and (fClickCount = 2) then
+      DoMouseSelectWordRange(BC)
+    else if (ActiveSelectionMode = smNormal) and (fClickCount = 3) then
+      DoMouseSelectLineRange(BC)
+    else begin
+      InternalCaretXY := BC;
+      BlockEnd := BC;
+    end;
+
     if (sfPossibleGutterClick in fStateFlags) and (FBlockBegin.Line <> CaretXY.Line) then
       Include(fStateFlags, sfGutterDragging);
   end;
@@ -2223,8 +2233,6 @@ begin
   C := PixelsToRowColumn( iMousePos.X, iMousePos.Y );
   C.Row := MinMax(C.Row, 1, DisplayLineCount);
 
-//  if (fScrollDeltaX < 0) and (LeftChar <= 1) then
-//    fScrollDeltaX := 0;
   if fScrollDeltaX <> 0 then
   begin
     LeftChar := LeftChar + fScrollDeltaX;
@@ -2246,15 +2254,23 @@ begin
   end;
 
   vCaret := DisplayToBufferPos(C);
-  if (CaretX <> vCaret.Char) or (CaretY <> vCaret.Line) then
+  if ((CaretX <> vCaret.Char) or (CaretY <> vCaret.Line)) then
   begin
     // changes to line / column in one go
     IncPaintLock;
     try
-      InternalCaretXY := vCaret;
-      // if MouseCapture is True we're changing selection. otherwise we're dragging
-      if MouseCapture then
-        SetBlockEnd(CaretXY);
+      if MouseCapture and (fClickCount = 2) and (ActiveSelectionMode = smNormal) then
+        // Line selection
+        DoMouseSelectWordRange(vCaret)
+      else if MouseCapture and (fClickCount = 3) and (ActiveSelectionMode = smNormal) then
+        // Line selection
+        DoMouseSelectLineRange(vCaret)
+      else begin
+        InternalCaretXY := vCaret;
+        // if MouseCapture is True we're changing selection. otherwise we're dragging
+        if MouseCapture then
+          SetBlockEnd(CaretXY);
+      end;
     finally
       DecPaintLock;
     end;
@@ -5062,9 +5078,12 @@ end;
 
 procedure TCustomSynEdit.WMDestroy(var Message: TWMDestroy);
 begin
-  // assign WindowText here, otherwise the VCL will call GetText twice
-  if WindowText = nil then
-     WindowText := Lines.GetText;
+  // See https://en.delphipraxis.net/topic/456-destroywnd-not-called-at-destruction-of-wincontrols/
+  if (eoDropFiles in fOptions) and not (csDesigning in ComponentState) then
+    DragAcceptFiles(Handle, False);
+
+  RevokeDragDrop(Handle);
+
   inherited;
 end;
 
@@ -5085,16 +5104,7 @@ end;
 
 procedure TCustomSynEdit.WMGetText(var Msg: TWMGetText);
 begin
-  if HandleAllocated and IsWindowUnicode(Handle) then
-  begin
-    WStrLCopy(PWideChar(Msg.Text), PWideChar(Text), Msg.TextMax - 1);
-    Msg.Result := Length(PWideChar(Msg.Text));
-  end
-  else
-  begin
-   AnsiStrings.StrLCopy(PAnsiChar(Msg.Text), PAnsiChar(AnsiString(Text)), Msg.TextMax - 1);
-    Msg.Result := AnsiStrings.StrLen(PAnsiChar(Msg.Text));
-  end;
+  Msg.Result := StrLen(StrLCopy(PChar(Msg.Text), PChar(Text), Msg.TextMax - 1));
 end;
 
 procedure TCustomSynEdit.WMGetTextLength(var Msg: TWMGetTextLength);
@@ -5143,12 +5153,6 @@ begin
   if Assigned(OnScroll) then OnScroll(Self,sbHorizontal);
 end;
 
-function IsWindows98orLater: Boolean;
-begin
-  Result := (Win32MajorVersion > 4) or
-    (Win32MajorVersion = 4) and (Win32MinorVersion > 0);
-end;
-
 procedure TCustomSynEdit.WMImeChar(var Msg: TMessage);
 begin
   // do nothing here, the IME string is retrieved in WMImeComposition
@@ -5161,49 +5165,21 @@ procedure TCustomSynEdit.WMImeComposition(var Msg: TMessage);
 var
   imc: HIMC;
   PW: PWideChar;
-  PA: PAnsiChar;
-  PWLength: Integer;
   ImeCount: Integer;
 begin
   if (Msg.LParam and GCS_RESULTSTR) <> 0 then
   begin
     imc := ImmGetContext(Handle);
     try
-      if IsWindows98orLater then
-      begin
-        ImeCount := ImmGetCompositionStringW(imc, GCS_RESULTSTR, nil, 0);
-        // ImeCount is always the size in bytes, also for Unicode
-        GetMem(PW, ImeCount + sizeof(WideChar));
-        try
-          ImmGetCompositionStringW(imc, GCS_RESULTSTR, PW, ImeCount);
-          PW[ImeCount div sizeof(WideChar)] := #0;
-          CommandProcessor(ecImeStr, #0, PW);
-        finally
-          FreeMem(PW);
-        end;
-      end
-      else
-      begin
-        ImeCount := ImmGetCompositionStringA(imc, GCS_RESULTSTR, nil, 0);
-        // ImeCount is always the size in bytes, also for Unicode
-        GetMem(PA, ImeCount + sizeof(AnsiChar));
-        try
-          ImmGetCompositionStringA(imc, GCS_RESULTSTR, PA, ImeCount);
-          PA[ImeCount] := #0;
-
-          PWLength := MultiByteToWideChar(DefaultSystemCodePage, 0, PA, ImeCount,
-            nil, 0);
-          GetMem(PW, (PWLength + 1) * sizeof(WideChar));
-          try
-            MultiByteToWideChar(DefaultSystemCodePage, 0, PA, ImeCount,
-              PW, PWLength);
-            CommandProcessor(ecImeStr, #0, PW);
-          finally
-            FreeMem(PW);
-          end;
-        finally
-          FreeMem(PA);
-        end;
+      ImeCount := ImmGetCompositionStringW(imc, GCS_RESULTSTR, nil, 0);
+      // ImeCount is always the size in bytes, also for Unicode
+      GetMem(PW, ImeCount + sizeof(WideChar));
+      try
+        ImmGetCompositionStringW(imc, GCS_RESULTSTR, PW, ImeCount);
+        PW[ImeCount div sizeof(WideChar)] := #0;
+        CommandProcessor(ecImeStr, #0, PW);
+      finally
+        FreeMem(PW);
       end;
     finally
       ImmReleaseContext(Handle, imc);
@@ -5216,7 +5192,6 @@ procedure TCustomSynEdit.WMImeNotify(var Msg: TMessage);
 var
   imc: HIMC;
   LogFontW: TLogFontW;
-  LogFontA: TLogFontA;
 begin
   with Msg do
   begin
@@ -5226,16 +5201,8 @@ begin
           imc := ImmGetContext(Handle);
           if imc <> 0 then
           begin
-            if IsWindows98orLater then
-            begin
-              GetObjectW(Font.Handle, SizeOf(TLogFontW), @LogFontW);
-              ImmSetCompositionFontW(imc, @LogFontW);
-            end
-            else
-            begin
-              GetObjectA(Font.Handle, SizeOf(TLogFontA), @LogFontA);
-              ImmSetCompositionFontA(imc, @LogFontA);
-            end;
+            GetObjectW(Font.Handle, SizeOf(TLogFontW), @LogFontW);
+            ImmSetCompositionFontW(imc, @LogFontW);
             ImmReleaseContext(Handle, imc);
           end;
         end;
@@ -5281,15 +5248,7 @@ end;
 procedure TCustomSynEdit.WMSetText(var Msg: TWMSetText);
 begin
   Msg.Result := 1;
-  try
-    if HandleAllocated and IsWindowUnicode(Handle) then
-      Text := PWideChar(Msg.Text)
-    else
-      Text := string(PAnsiChar(Msg.Text));
-  except
-    Msg.Result := 0;
-    raise
-  end
+  Text := PWideChar(Msg.Text)
 end;
 
 procedure TCustomSynEdit.WMSize(var Msg: TWMSize);
@@ -5631,7 +5590,6 @@ begin
     if not (eoNoSelection in fOptions) then
       SetWordBlock(CaretXY);
     inherited;
-    MouseCapture := False;
   end
   else
     inherited;
@@ -6039,6 +5997,79 @@ begin
   InvalidateGutterLines(-1, -1);
 
   EnsureCursorPosVisible;
+end;
+
+procedure TCustomSynEdit.DoMouseSelectLineRange(NewPos: TBufferCoord);
+{ Select whole lines }
+var
+  BB, BE: TBufferCoord;
+begin
+  BB := BlockBegin;
+  BE := BlockEnd;
+  //  Set AnchorLine
+  if CaretXY >= BE then
+  begin
+    if BB.Line < Lines.Count then
+      BE := BufferCoord(1, BB.Line + 1)
+    else
+      BE := BufferCoord(Length(Lines[BB.Line - 1]), BB.Line);
+  end
+  else
+  begin
+    BB := BufferCoord(1, Max(1, IfThen(BE.Line < Lines.Count, BE.Line - 1, BE.Line)));
+  end;
+  if NewPos.Line < BB.Line then
+  begin
+    BB := BufferCoord(1, NewPos.Line);
+    NewPos := BB;
+  end
+  else if NewPos.Line >= BE.Line then
+  begin
+    if NewPos.Line < Lines.Count then
+      BE := BufferCoord(1, NewPos.Line + 1)
+    else
+      BE := BufferCoord(Length(Lines[NewPos.Line - 1]), NewPos.Line);
+    NewPos := BE;
+  end
+  else
+    NewPos := BE;
+  InternalCaretXY := NewPos;
+  if BB <> fBlockBegin then
+    BlockBegin := BB;
+  if BE <> fBlockEnd then
+    BlockEnd := BE;
+end;
+
+procedure TCustomSynEdit.DoMouseSelectWordRange(NewPos: TBufferCoord);
+{ Select whole words }
+var
+  BB, BE: TBufferCoord;
+begin
+  //  Set Anchor Selection (Word)
+  BB := BlockBegin;
+  BE := BlockEnd;
+  if CaretXY > BB then
+    BE := WordEndEx(BB)
+  else
+    BB := WordStartEx(BE);
+
+  NewPos.Char := Min(NewPos.Char, Lines[NewPos.Line-1].Length + 1);
+  if NewPos > BE then begin
+    BE := NewPos;
+    if (BE.Char > 1) and IsIdentChar(Lines[BE.Line-1][BE.Char - 1]) then
+      BE := WordEndEx(BE);
+  end else if NewPos < BB then begin
+    BB := BE;
+    BE := NewPos;
+    if (BE.Char < Lines[BE.Line-1].Length) and IsIdentChar(Lines[BE.Line-1][BE.Char]) then
+      BE := WordStartEx(BE);
+  end;
+
+  if BB <> fBlockBegin then
+    BlockBegin := BB;
+  if BE <> fBlockEnd then
+    BlockEnd := BE;
+  InternalCaretXY := fBlockEnd;
 end;
 
 procedure TCustomSynEdit.ExecCmdCopyOrMoveLine(Command: TSynEditorCommand);
@@ -6508,11 +6539,6 @@ begin
   end;
 end;
 
-function IsTextMessage(Msg: UINT): Boolean;
-begin
-  Result := (Msg = WM_SETTEXT) or (Msg = WM_GETTEXT) or (Msg = WM_GETTEXTLENGTH);
-end;
-
 procedure TCustomSynEdit.WndProc(var Msg: TMessage);
 const
   ALT_KEY_DOWN = $20000000;
@@ -6522,21 +6548,6 @@ begin
     (Msg.lParam and ALT_KEY_DOWN <> 0)
   then
     Msg.Msg := 0;
-
-  // handle direct WndProc calls that could happen through VCL-methods like Perform
-  if HandleAllocated and IsWindowUnicode(Handle) then
-    if not FWindowProducedMessage then
-    begin
-      FWindowProducedMessage := True;
-      if IsTextMessage(Msg.Msg) then
-      begin
-        with Msg do
-          Result := SendMessageA(Handle, Msg, wParam, lParam);
-        Exit;
-      end;
-    end
-    else
-      FWindowProducedMessage := False;
 
   inherited;
 end;
@@ -7035,9 +7046,7 @@ procedure TCustomSynEdit.TripleClick;
 Var
   BB, BE : TBufferCoord;
 begin
-  if Assigned(fOnTripleClick) then
-    fOnTripleClick(Self)
-  else if not (eoNoSelection in fOptions) then
+  if not (eoNoSelection in fOptions) then
   begin
     BB := BufferCoord(1, CaretY);
     if CaretY < Lines.Count then
@@ -7046,6 +7055,8 @@ begin
       BE := BufferCoord(Length(Lines[CaretY-1]) + 1, CaretY);
     SetCaretAndSelection(BE, BB, BE);
   end;
+  if Assigned(fOnTripleClick) then
+    fOnTripleClick(Self);
 end;
 
 procedure TCustomSynEdit.CommandProcessor(Command: TSynEditorCommand;
@@ -9255,12 +9266,18 @@ begin
       BufferCoord(vNewX, CaretY), Selection);
 end;
 
-procedure TCustomSynEdit.CreateWindowHandle(const Params: TCreateParams);
+procedure TCustomSynEdit.CreateWnd;
 Var
   DropTarget : TSynDropTarget;
 begin
   inherited;
-  if HandleAllocated then begin
+  //  This is to avoid getting the text of the control while recreating
+  WindowText := StrNew('SynEdit');  // dummy caption
+
+  if (eoDropFiles in fOptions) and not (csDesigning in ComponentState) then
+    DragAcceptFiles(Handle, True);
+
+  if not (csDesigning in ComponentState) then begin
     DropTarget := TSynDropTarget.Create;
     with DropTarget do begin
       OnDragEnter := OleDragEnter;
@@ -9270,27 +9287,8 @@ begin
     end;
     RegisterDragDrop (Handle, DropTarget);
   end;
-end;
-
-procedure TCustomSynEdit.CreateWnd;
-begin
-  inherited;
-
-  if (eoDropFiles in fOptions) and not (csDesigning in ComponentState) then
-    DragAcceptFiles(Handle, True);
 
   UpdateScrollBars;
-end;
-
-procedure TCustomSynEdit.DestroyWnd;
-begin
-  if (eoDropFiles in fOptions) and not (csDesigning in ComponentState) then
-    DragAcceptFiles(Handle, False);
-
-  // assign WindowText here, otherwise the VCL will call GetText twice
-  if WindowText = nil then
-     WindowText := Lines.GetText;
-  inherited;
 end;
 
 procedure TCustomSynEdit.InvalidateRect(const aRect: TRect; aErase: Boolean);
@@ -9347,10 +9345,10 @@ begin
     end;
     for i := BB.Line to e-1 do
     begin
-      WStrCopy(Run, PWideChar(Spaces + #13#10));
+      StrCopy(Run, PWideChar(Spaces + #13#10));
       Inc(Run, Length(spaces) + 2);
     end;
-    WStrCopy(Run, PWideChar(Spaces));
+    StrCopy(Run, PWideChar(Spaces));
 
     fUndoList.BeginBlock;
     try
@@ -9375,7 +9373,7 @@ begin
   finally
     if BE.Char > 1 then
       Inc(BE.Char, Length(Spaces));
-    WStrDispose(StrToInsert);
+    StrDispose(StrToInsert);
     SetCaretAndSelection(OrgCaretPos,
       BufferCoord(BB.Char + Length(Spaces), BB.Line), BE);
     ActiveSelectionMode := OrgSelectionMode;
@@ -9454,8 +9452,8 @@ begin
        //Instead of doing a UnicodeStringOfChar, we need to get *exactly* what was
        //being deleted incase there is a TabChar
        TmpDelLen := GetDelLen;
-       WStrCat(StrToDelete, PWideChar(Copy(Line, 1, TmpDelLen)));
-       WStrCat(StrToDelete, PWideChar(string(#13#10)));
+       StrCat(StrToDelete, PWideChar(Copy(Line, 1, TmpDelLen)));
+       StrCat(StrToDelete, PWideChar(string(#13#10)));
        if (fCaretY = i) and (x <> 1) then
          x := x - TmpDelLen;
     end;
@@ -9463,7 +9461,7 @@ begin
     if fActiveSelectionMode = smColumn then
       Inc(Line, MinIntValue([BB.Char - 1, BE.Char - 1, Length(Lines[e - 1])]));
     TmpDelLen := GetDelLen;
-    WStrCat(StrToDelete, PWideChar(Copy(Line, 1, TmpDelLen)));
+    StrCat(StrToDelete, PWideChar(Copy(Line, 1, TmpDelLen)));
     if (fCaretY = e) and (x <> 1) then
       x := x - TmpDelLen;
 
@@ -9519,9 +9517,9 @@ begin
     end;
     ActiveSelectionMode := OrgSelectionMode;
     if FullStrToDelete <> nil then
-      WStrDispose(FullStrToDelete)
+      StrDispose(FullStrToDelete)
     else
-      WStrDispose(StrToDelete);
+      StrDispose(StrToDelete);
   end;
 end;
 
@@ -10080,7 +10078,10 @@ begin
         inc(x, TabWidth - (x mod TabWidth))
       else if i <= l then
       begin
-        CountOfAvgGlyphs := CeilOfIntDiv(fTextDrawer.TextWidth(s[i]) , fCharWidth);
+        if Ord(S[i]) <= $00FF then
+          CountOfAvgGlyphs := 1
+        else
+          CountOfAvgGlyphs := CeilOfIntDiv(fTextDrawer.TextWidth(s[i]) , fCharWidth);
         inc(x, CountOfAvgGlyphs);
       end
       else
@@ -10144,7 +10145,10 @@ begin
         inc(x, TabWidth - (x mod TabWidth))
       else if i <= l then
       begin
-        CountOfAvgGlyphs := CeilOfIntDiv(fTextDrawer.TextWidth(s[i]) , fCharWidth);
+        if Ord(s[i]) <= $00FF then
+          CountOfAvgGlyphs := 1
+        else
+          CountOfAvgGlyphs := CeilOfIntDiv(fTextDrawer.TextWidth(s[i]) , fCharWidth);
         inc(x, CountOfAvgGlyphs);
       end
       else
@@ -10206,10 +10210,10 @@ end;
 
 procedure TCustomSynEdit.QuadrupleClick;
 begin
-  if Assigned(fOnQudrupleClick) then
-    fOnQudrupleClick(Self)
-  else if not (eoNoSelection in fOptions) then
+  if not (eoNoSelection in fOptions) then
     SelectAll;
+  if Assigned(fOnQudrupleClick) then
+    fOnQudrupleClick(Self);
 end;
 
 procedure TCustomSynEdit.AddKeyUpHandler(aHandler: TKeyEvent);

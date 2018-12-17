@@ -53,7 +53,6 @@ uses
   SynEditPlugins,
   SynEditTypes,
   SynUnicode,
-  WideStrUtils,
   Classes;
 
 resourcestring
@@ -974,7 +973,7 @@ begin
   GetMem(Buff, l * sizeof(WideChar));
   try
     FillMemory(Buff, l, 0);
-    WStrCopy(Buff, PWideChar(Value));
+    StrCopy(Buff, PWideChar(Value));
     aStream.Write(Buff^, l * sizeof(WideChar));
   finally
     FreeMem(Buff);
