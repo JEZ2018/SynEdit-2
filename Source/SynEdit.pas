@@ -411,8 +411,6 @@ type
     FAdditionalIdentChars: TSysCharSet;
     SelStartBeforeSearch: integer;
     SelLengthBeforeSearch: integer;
-    FWindowProducedMessage: Boolean;
-
 
     // event handlers
     fOnChange: TNotifyEvent;
@@ -6502,11 +6500,6 @@ begin
   end;
 end;
 
-function IsTextMessage(Msg: UINT): Boolean;
-begin
-  Result := (Msg = WM_SETTEXT) or (Msg = WM_GETTEXT) or (Msg = WM_GETTEXTLENGTH);
-end;
-
 procedure TCustomSynEdit.WndProc(var Msg: TMessage);
 const
   ALT_KEY_DOWN = $20000000;
@@ -6516,21 +6509,6 @@ begin
     (Msg.lParam and ALT_KEY_DOWN <> 0)
   then
     Msg.Msg := 0;
-
-  // handle direct WndProc calls that could happen through VCL-methods like Perform
-  if HandleAllocated and IsWindowUnicode(Handle) then
-    if not FWindowProducedMessage then
-    begin
-      FWindowProducedMessage := True;
-      if IsTextMessage(Msg.Msg) then
-      begin
-        with Msg do
-          Result := SendMessageA(Handle, Msg, wParam, lParam);
-        Exit;
-      end;
-    end
-    else
-      FWindowProducedMessage := False;
 
   inherited;
 end;
