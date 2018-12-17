@@ -5121,12 +5121,6 @@ begin
   if Assigned(OnScroll) then OnScroll(Self,sbHorizontal);
 end;
 
-function IsWindows98orLater: Boolean;
-begin
-  Result := (Win32MajorVersion > 4) or
-    (Win32MajorVersion = 4) and (Win32MinorVersion > 0);
-end;
-
 procedure TCustomSynEdit.WMImeChar(var Msg: TMessage);
 begin
   // do nothing here, the IME string is retrieved in WMImeComposition
@@ -5139,49 +5133,21 @@ procedure TCustomSynEdit.WMImeComposition(var Msg: TMessage);
 var
   imc: HIMC;
   PW: PWideChar;
-  PA: PAnsiChar;
-  PWLength: Integer;
   ImeCount: Integer;
 begin
   if (Msg.LParam and GCS_RESULTSTR) <> 0 then
   begin
     imc := ImmGetContext(Handle);
     try
-      if IsWindows98orLater then
-      begin
-        ImeCount := ImmGetCompositionStringW(imc, GCS_RESULTSTR, nil, 0);
-        // ImeCount is always the size in bytes, also for Unicode
-        GetMem(PW, ImeCount + sizeof(WideChar));
-        try
-          ImmGetCompositionStringW(imc, GCS_RESULTSTR, PW, ImeCount);
-          PW[ImeCount div sizeof(WideChar)] := #0;
-          CommandProcessor(ecImeStr, #0, PW);
-        finally
-          FreeMem(PW);
-        end;
-      end
-      else
-      begin
-        ImeCount := ImmGetCompositionStringA(imc, GCS_RESULTSTR, nil, 0);
-        // ImeCount is always the size in bytes, also for Unicode
-        GetMem(PA, ImeCount + sizeof(AnsiChar));
-        try
-          ImmGetCompositionStringA(imc, GCS_RESULTSTR, PA, ImeCount);
-          PA[ImeCount] := #0;
-
-          PWLength := MultiByteToWideChar(DefaultSystemCodePage, 0, PA, ImeCount,
-            nil, 0);
-          GetMem(PW, (PWLength + 1) * sizeof(WideChar));
-          try
-            MultiByteToWideChar(DefaultSystemCodePage, 0, PA, ImeCount,
-              PW, PWLength);
-            CommandProcessor(ecImeStr, #0, PW);
-          finally
-            FreeMem(PW);
-          end;
-        finally
-          FreeMem(PA);
-        end;
+      ImeCount := ImmGetCompositionStringW(imc, GCS_RESULTSTR, nil, 0);
+      // ImeCount is always the size in bytes, also for Unicode
+      GetMem(PW, ImeCount + sizeof(WideChar));
+      try
+        ImmGetCompositionStringW(imc, GCS_RESULTSTR, PW, ImeCount);
+        PW[ImeCount div sizeof(WideChar)] := #0;
+        CommandProcessor(ecImeStr, #0, PW);
+      finally
+        FreeMem(PW);
       end;
     finally
       ImmReleaseContext(Handle, imc);
@@ -5194,7 +5160,6 @@ procedure TCustomSynEdit.WMImeNotify(var Msg: TMessage);
 var
   imc: HIMC;
   LogFontW: TLogFontW;
-  LogFontA: TLogFontA;
 begin
   with Msg do
   begin
@@ -5204,16 +5169,8 @@ begin
           imc := ImmGetContext(Handle);
           if imc <> 0 then
           begin
-            if IsWindows98orLater then
-            begin
-              GetObjectW(Font.Handle, SizeOf(TLogFontW), @LogFontW);
-              ImmSetCompositionFontW(imc, @LogFontW);
-            end
-            else
-            begin
-              GetObjectA(Font.Handle, SizeOf(TLogFontA), @LogFontA);
-              ImmSetCompositionFontA(imc, @LogFontA);
-            end;
+            GetObjectW(Font.Handle, SizeOf(TLogFontW), @LogFontW);
+            ImmSetCompositionFontW(imc, @LogFontW);
             ImmReleaseContext(Handle, imc);
           end;
         end;
@@ -9297,7 +9254,7 @@ Var
 begin
   inherited;
   //  This is to avoid getting the text of the control while recreating
-  WindowText := StrNew('SynEdit');
+  WindowText := StrNew('SynEdit');  // dummy caption
 
   if (eoDropFiles in fOptions) and not (csDesigning in ComponentState) then
     DragAcceptFiles(Handle, True);
