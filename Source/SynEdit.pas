@@ -581,9 +581,7 @@ type
     function DoMouseWheel(Shift: TShiftState; WheelDelta: Integer;
       MousePos: TPoint): Boolean; override;
     procedure CreateParams(var Params: TCreateParams); override;
-    procedure CreateWindowHandle(const Params: TCreateParams); override;
     procedure CreateWnd; override;
-    procedure DestroyWnd; override;
     procedure InvalidateRect(const aRect: TRect; aErase: Boolean); virtual;
     procedure DblClick; override;
     procedure TripleClick; virtual;
@@ -5052,11 +5050,8 @@ begin
   if (eoDropFiles in fOptions) and not (csDesigning in ComponentState) then
     DragAcceptFiles(Handle, False);
 
-   RevokeDragDrop(Handle);
+  RevokeDragDrop(Handle);
 
-  // assign WindowText here, otherwise the VCL will call GetText twice
-  if WindowText = nil then
-     WindowText := Lines.GetText;
   inherited;
 end;
 
@@ -5264,15 +5259,7 @@ end;
 procedure TCustomSynEdit.WMSetText(var Msg: TWMSetText);
 begin
   Msg.Result := 1;
-  try
-    if HandleAllocated and IsWindowUnicode(Handle) then
-      Text := PWideChar(Msg.Text)
-    else
-      Text := string(PAnsiChar(Msg.Text));
-  except
-    Msg.Result := 0;
-    raise
-  end
+  Text := PWideChar(Msg.Text)
 end;
 
 procedure TCustomSynEdit.WMSize(var Msg: TWMSize);
@@ -9304,12 +9291,18 @@ begin
       BufferCoord(vNewX, CaretY), Selection);
 end;
 
-procedure TCustomSynEdit.CreateWindowHandle(const Params: TCreateParams);
+procedure TCustomSynEdit.CreateWnd;
 Var
   DropTarget : TSynDropTarget;
 begin
   inherited;
-  if HandleAllocated then begin
+  //  This is to avoid getting the text of the control while recreating
+  WindowText := StrNew('SynEdit');
+
+  if (eoDropFiles in fOptions) and not (csDesigning in ComponentState) then
+    DragAcceptFiles(Handle, True);
+
+  if not (csDesigning in ComponentState) then begin
     DropTarget := TSynDropTarget.Create;
     with DropTarget do begin
       OnDragEnter := OleDragEnter;
@@ -9319,24 +9312,8 @@ begin
     end;
     RegisterDragDrop (Handle, DropTarget);
   end;
-end;
-
-procedure TCustomSynEdit.CreateWnd;
-begin
-  inherited;
-
-  if (eoDropFiles in fOptions) and not (csDesigning in ComponentState) then
-    DragAcceptFiles(Handle, True);
 
   UpdateScrollBars;
-end;
-
-procedure TCustomSynEdit.DestroyWnd;
-begin
-  // assign WindowText here, otherwise the VCL will call GetText twice
-  if WindowText = nil then
-     WindowText := Lines.GetText;
-  inherited;
 end;
 
 procedure TCustomSynEdit.InvalidateRect(const aRect: TRect; aErase: Boolean);
