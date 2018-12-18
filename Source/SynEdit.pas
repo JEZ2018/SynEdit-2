@@ -95,10 +95,6 @@ type
   TDropFilesEvent = procedure(Sender: TObject; X, Y: Integer; AFiles: TStrings)
     of object;
 
-  THookedCommandEvent = procedure(Sender: TObject; AfterProcessing: Boolean;
-    var Handled: Boolean; var Command: TSynEditorCommand; var AChar: WideChar;
-    Data: pointer; HandlerData: pointer) of object;
-
   TPaintEvent = procedure(Sender: TObject; ACanvas: TCanvas) of object;
 
   TProcessCommandEvent = procedure(Sender: TObject;

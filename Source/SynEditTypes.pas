@@ -60,6 +60,12 @@ type
 
   TCategoryMethod = function(AChar: WideChar): Boolean of object;
 
+  TSynEditorCommand = type word;
+
+  THookedCommandEvent = procedure(Sender: TObject; AfterProcessing: Boolean;
+    var Handled: Boolean; var Command: TSynEditorCommand; var AChar: WideChar;
+    Data: pointer; HandlerData: pointer) of object;
+
   TKeyPressWEvent = procedure(Sender: TObject; var Key: WideChar) of object;
 
   PSynSelectionMode = ^TSynSelectionMode;
