@@ -361,8 +361,10 @@ begin
     try
       for I := 1 to Count do begin
         Caret := TCaretItem.Create;
+        Caret.Index := I;
         if not Caret.LoadFromStream(S) then
-          Abort
+          Abort;
+        NewList.Add(Caret);
       end;
       Clear(False);
       for I := 0 to NewList.Count-1 do begin
@@ -373,6 +375,8 @@ begin
           FDefaultCaret := Caret;
       end;
       Result := True;
+      if Assigned(FOnChanged) then
+        FOnChanged(Self);
     except on EAbort do
       for J := 0 to NewList.Count-1 do
         NewList[J].Free;
