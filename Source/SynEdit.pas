@@ -464,7 +464,6 @@ type
     procedure DoLinesInserted(FirstLine, Count: integer);
     procedure DoShiftTabKey;
     procedure DoTabKey;
-    procedure DoCaseChange(const Cmd : TSynEditorCommand);
     function FindHookedCmdEvent(AHandlerProc: THookedCommandEvent): integer;
     procedure SynFontChanged(Sender: TObject);
     procedure ForceCaretX(aCaretX: integer);
@@ -820,7 +819,8 @@ type
     procedure UnHookTextBuffer;
     {Command implementations}
     procedure ExecCmdDeleteLine;
-    procedure ExecCmdCopyOrMoveLine(Command: TSynEditorCommand);
+    procedure ExecCmdCopyOrMoveLine(const Command: TSynEditorCommand);
+    procedure ExecCmdCaseChange(const Cmd : TSynEditorCommand);
 //++ CodeFolding
     procedure CollapseAll;
     procedure UncollapseAll;
@@ -1086,6 +1086,7 @@ implementation
 uses
   Types,
   Consts,
+  Character,
   AnsiStrings,
   Clipbrd,
   ShellAPI,
@@ -6033,7 +6034,7 @@ begin
   InternalCaretXY := fBlockEnd;
 end;
 
-procedure TCustomSynEdit.ExecCmdCopyOrMoveLine(Command: TSynEditorCommand);
+procedure TCustomSynEdit.ExecCmdCopyOrMoveLine(const Command: TSynEditorCommand);
 var
   vCaretRow, SelShift: Integer;
   Caret, BB, BE: TBufferCoord;
@@ -7606,11 +7607,8 @@ begin
       ecUpperCase,
       ecLowerCase,
       ecToggleCase,
-      ecTitleCase,
-      ecUpperCaseBlock,
-      ecLowerCaseBlock,
-      ecToggleCaseBlock:
-        if not ReadOnly then DoCaseChange(Command);
+      ecTitleCase:
+        ExecCmdCaseChange(Command);
       ecUndo:
         begin
           if not ReadOnly then Undo;
@@ -8762,15 +8760,14 @@ begin
     DoOnStatusChange(fStatusChanges);
 end;
 
-procedure TCustomSynEdit.DoCaseChange(const Cmd: TSynEditorCommand);
-
+procedure TCustomSynEdit.ExecCmdCaseChange(const Cmd: TSynEditorCommand);
   function ToggleCase(const aStr: string): string;
   var
     i: Integer;
     sLower: string;
   begin
-    Result := SynWideUpperCase(aStr);
-    sLower := SynWideLowerCase(aStr);
+    Result := aStr.ToUpper;
+    sLower := aStr.ToLower;
     for i := 1 to Length(aStr) do
     begin
       if Result[i] = aStr[i] then
@@ -8778,12 +8775,27 @@ procedure TCustomSynEdit.DoCaseChange(const Cmd: TSynEditorCommand);
     end;
   end;
 
+  Function TitleCase(S:string) : string;
+  Var
+    i : Integer;
+  Begin
+    S[1] := S[1].ToUpper;
+    For i := 1 to Length(S)-1 Do
+      If IsWordBreakChar(S[i]) then
+        S[i+1] := S[i+1].ToUpper
+      else
+        S[i+1] := S[i+1].ToLower;
+    Result := S;
+  End;
+
 var
   w: string;
   oldCaret, oldBlockBegin, oldBlockEnd: TBufferCoord;
   bHadSel : Boolean;
 begin
-  Assert((Cmd >= ecUpperCase) and (Cmd <= ecToggleCaseBlock));
+  Assert((Cmd >= ecUpperCase) and (Cmd <= ecTitleCase));
+  if ReadOnly then Exit;
+
   if SelAvail then
   begin
     bHadSel := True;
@@ -8795,48 +8807,21 @@ begin
   end;
   oldCaret := CaretXY;
   try
-    if Cmd < ecUpperCaseBlock then
-    begin
-      { word commands }
+    if not SelAvail then
       SetSelWord;
-      if SelText = '' then
-      begin
-        { searches a previous word }
-        InternalCaretXY := PrevWordPos;
-        SetSelWord;
-        if SelText = '' then
-        begin
-          { try once more since PrevWordPos may have failed last time.
-          (PrevWordPos "points" to the end of the previous line instead of the
-          beggining of the previous word if invoked (e.g.) when CaretX = 1) }
-          InternalCaretXY := PrevWordPos;
-          SetSelWord;
-        end;
-      end;
-    end
-    else begin
-      { block commands }
-      if not SelAvail then
-      begin
-        if CaretX <= Length(LineText) then
-          MoveCaretHorz(1, True)
-        else if CaretY < Lines.Count then
-          InternalCaretXY := BufferCoord(1, CaretY +1);
-      end;
-    end;
 
     w := SelText;
     if w <> '' then
     begin
       case Cmd of
-        ecUpperCase, ecUpperCaseBlock:
-          w := SynWideUpperCase(w);
-        ecLowerCase, ecLowerCaseBlock:
-          w := SynWideLowerCase(w);
-        ecToggleCase, ecToggleCaseBlock:
+        ecUpperCase:
+          w := w.ToUpper(LOCALE_INVARIANT);
+        ecLowerCase:
+          w := w.ToLower(LOCALE_INVARIANT);
+        ecToggleCase:
           w := ToggleCase(w);
         ecTitleCase:
-          w := SynWideUpperCase(w[1]) + SynWideLowerCase(Copy(w, 2, Length(w)));
+          w := TitleCase(w);
       end;
       BeginUndoBlock;
       try
@@ -8851,15 +8836,7 @@ begin
       end;
     end;
   finally
-    { "word" commands do not restore Selection }
-    if bHadSel and (Cmd >= ecUpperCaseBlock) then
-    begin
-      BlockBegin := oldBlockBegin;
-      BlockEnd := oldBlockEnd;
-    end;
-    { "block" commands with empty Selection move the Caret }
-    if bHadSel or (Cmd < ecUpperCaseBlock) then
-      CaretXY := oldCaret;
+    SetCaretAndSelection(oldCaret, oldBlockBegin, oldBlockEnd);
   end;
 end;
 
@@ -10833,7 +10810,6 @@ begin
   if not (csLoading in ComponentState) then
     InvalidateGutter;
 end;
-
 
 { TSynEditMark }
 

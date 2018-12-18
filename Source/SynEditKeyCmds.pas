@@ -185,13 +185,10 @@ const
   ecTab             = 612;  // Tab key
   ecShiftTab        = 613;  // Shift+Tab key
 
-  ecUpperCase       = 620; // apply to the current or previous word
+  ecUpperCase       = 620; // apply to the current selction or word
   ecLowerCase       = 621;
   ecToggleCase      = 622;
   ecTitleCase       = 623;
-  ecUpperCaseBlock  = 625; // apply to current selection, or current char if no selection
-  ecLowerCaseBlock  = 626;
-  ecToggleCaseBlock = 627;
 
   ecString          = 630;  //Insert a whole string
 
@@ -314,7 +311,7 @@ uses
 
 const
 //++ CodeFolding
-  EditorCommandStrs: array[0..116] of TIdentMapEntry = (
+  EditorCommandStrs: array[0..113] of TIdentMapEntry = (
 //-- CodeFolding
     (Value: ecNone; Name: 'ecNone'),
     (Value: ecLeft; Name: 'ecLeft'),
@@ -413,9 +410,6 @@ const
     (Value: ecLowerCase; Name: 'ecLowerCase'),
     (Value: ecToggleCase; Name: 'ecToggleCase'),
     (Value: ecTitleCase; Name: 'ecTitleCase'),
-    (Value: ecUpperCaseBlock; Name: 'ecUpperCaseBlock'),
-    (Value: ecLowerCaseBlock; Name: 'ecLowerCaseBlock'),
-    (Value: ecToggleCaseBlock; Name: 'ecToggleCaseBlock'),
     (Value: ecCopyLineUp; Name:'ecCopyLineUp'),
     (Value: ecCopyLineDown; Name:'ecCopyLineDown'),
     (Value: ecMoveLineUp; Name:'ecMoveLineUp'),
@@ -799,43 +793,46 @@ begin
   AddKey(ecShiftTab, SYNEDIT_TAB, [ssShift]);
   AddKey(ecContextHelp, SYNEDIT_F1, []);
 
-  AddKey(ecSelectAll, ord('A'), [ssCtrl]);
-  AddKey(ecCopy, ord('C'), [ssCtrl]);
-  AddKey(ecPaste, ord('V'), [ssCtrl]);
-  AddKey(ecCut, ord('X'), [ssCtrl]);
-  AddKey(ecBlockIndent, ord('I'), [ssCtrl,ssShift]);
-  AddKey(ecBlockUnindent, ord('U'), [ssCtrl,ssShift]);
-  AddKey(ecLineBreak, ord('M'), [ssCtrl]);
-  AddKey(ecInsertLine, ord('N'), [ssCtrl]);
-  AddKey(ecDeleteWord, ord('T'), [ssCtrl]);
-  AddKey(ecDeleteLine, ord('Y'), [ssCtrl]);
-  AddKey(ecDeleteEOL, ord('Y'), [ssCtrl,ssShift]);
-  AddKey(ecUndo, ord('Z'), [ssCtrl]);
-  AddKey(ecRedo, ord('Z'), [ssCtrl,ssShift]);
-  AddKey(ecGotoMarker0, ord('0'), [ssCtrl]);
-  AddKey(ecGotoMarker1, ord('1'), [ssCtrl]);
-  AddKey(ecGotoMarker2, ord('2'), [ssCtrl]);
-  AddKey(ecGotoMarker3, ord('3'), [ssCtrl]);
-  AddKey(ecGotoMarker4, ord('4'), [ssCtrl]);
-  AddKey(ecGotoMarker5, ord('5'), [ssCtrl]);
-  AddKey(ecGotoMarker6, ord('6'), [ssCtrl]);
-  AddKey(ecGotoMarker7, ord('7'), [ssCtrl]);
-  AddKey(ecGotoMarker8, ord('8'), [ssCtrl]);
-  AddKey(ecGotoMarker9, ord('9'), [ssCtrl]);
-  AddKey(ecSetMarker0, ord('0'), [ssCtrl,ssShift]);
-  AddKey(ecSetMarker1, ord('1'), [ssCtrl,ssShift]);
-  AddKey(ecSetMarker2, ord('2'), [ssCtrl,ssShift]);
-  AddKey(ecSetMarker3, ord('3'), [ssCtrl,ssShift]);
-  AddKey(ecSetMarker4, ord('4'), [ssCtrl,ssShift]);
-  AddKey(ecSetMarker5, ord('5'), [ssCtrl,ssShift]);
-  AddKey(ecSetMarker6, ord('6'), [ssCtrl,ssShift]);
-  AddKey(ecSetMarker7, ord('7'), [ssCtrl,ssShift]);
-  AddKey(ecSetMarker8, ord('8'), [ssCtrl,ssShift]);
-  AddKey(ecSetMarker9, ord('9'), [ssCtrl,ssShift]);
-  AddKey(ecNormalSelect, ord('N'), [ssCtrl,ssShift]);
-  AddKey(ecColumnSelect, ord('C'), [ssCtrl,ssShift]);
-  AddKey(ecLineSelect, ord('L'), [ssCtrl,ssShift]);
-  AddKey(ecMatchBracket, ord('B'), [ssCtrl,ssShift]);
+  AddKey(ecSelectAll, Ord('A'), [ssCtrl]);
+  AddKey(ecCopy, Ord('C'), [ssCtrl]);
+  AddKey(ecPaste, Ord('V'), [ssCtrl]);
+  AddKey(ecCut, Ord('X'), [ssCtrl]);
+  AddKey(ecBlockIndent, Ord('I'), [ssCtrl,ssShift]);
+  AddKey(ecBlockUnindent, Ord('U'), [ssCtrl,ssShift]);
+  AddKey(ecLineBreak, Ord('M'), [ssCtrl]);
+  AddKey(ecInsertLine, Ord('N'), [ssCtrl]);
+  AddKey(ecDeleteWord, Ord('T'), [ssCtrl]);
+  AddKey(ecDeleteLine, Ord('Y'), [ssCtrl]);
+  AddKey(ecDeleteEOL, Ord('Y'), [ssCtrl,ssShift]);
+  AddKey(ecUndo, Ord('Z'), [ssCtrl]);
+  AddKey(ecRedo, Ord('Z'), [ssCtrl,ssShift]);
+  AddKey(ecGotoMarker0, Ord('0'), [ssCtrl]);
+  AddKey(ecGotoMarker1, Ord('1'), [ssCtrl]);
+  AddKey(ecGotoMarker2, Ord('2'), [ssCtrl]);
+  AddKey(ecGotoMarker3, Ord('3'), [ssCtrl]);
+  AddKey(ecGotoMarker4, Ord('4'), [ssCtrl]);
+  AddKey(ecGotoMarker5, Ord('5'), [ssCtrl]);
+  AddKey(ecGotoMarker6, Ord('6'), [ssCtrl]);
+  AddKey(ecGotoMarker7, Ord('7'), [ssCtrl]);
+  AddKey(ecGotoMarker8, Ord('8'), [ssCtrl]);
+  AddKey(ecGotoMarker9, Ord('9'), [ssCtrl]);
+  AddKey(ecSetMarker0, Ord('0'), [ssCtrl,ssShift]);
+  AddKey(ecSetMarker1, Ord('1'), [ssCtrl,ssShift]);
+  AddKey(ecSetMarker2, Ord('2'), [ssCtrl,ssShift]);
+  AddKey(ecSetMarker3, Ord('3'), [ssCtrl,ssShift]);
+  AddKey(ecSetMarker4, Ord('4'), [ssCtrl,ssShift]);
+  AddKey(ecSetMarker5, Ord('5'), [ssCtrl,ssShift]);
+  AddKey(ecSetMarker6, Ord('6'), [ssCtrl,ssShift]);
+  AddKey(ecSetMarker7, Ord('7'), [ssCtrl,ssShift]);
+  AddKey(ecSetMarker8, Ord('8'), [ssCtrl,ssShift]);
+  AddKey(ecSetMarker9, Ord('9'), [ssCtrl,ssShift]);
+  AddKey(ecNormalSelect, Ord('N'), [ssCtrl,ssShift]);
+  AddKey(ecColumnSelect, Ord('C'), [ssCtrl,ssShift]);
+  AddKey(ecLineSelect, Ord('L'), [ssCtrl,ssShift]);
+  AddKey(ecMatchBracket, Ord('B'), [ssCtrl,ssShift]);
+  AddKey(ecLowerCase, Ord('K'), [ssCtrl], Ord('L'), [ssCtrl]);
+  AddKey(ecUpperCase, Ord('K'), [ssCtrl], Ord('U'), [ssCtrl]);
+  AddKey(ecTitleCase, Ord('K'), [ssCtrl], Ord('T'), [ssCtrl]);
   AddKey(ecCopyLineUp, SYNEDIT_UP, [ssShift, ssAlt]);
   AddKey(ecCopyLineDown, SYNEDIT_DOWN, [ssShift, ssAlt]);
   AddKey(ecMoveLineUp, SYNEDIT_UP, [ssAlt]);
@@ -845,12 +842,12 @@ begin
   AddKey(ecUnfoldAll,  VK_OEM_PLUS, [ssCtrl, ssShift]); {= +}
   AddKey(ecFoldNearest, VK_OEM_2, [ssCtrl]);  // Divide {'/'}
   AddKey(ecUnfoldNearest, VK_OEM_2, [ssCtrl, ssShift]);
-  AddKey(ecFoldLevel1, ord('K'), [ssCtrl], Ord('1'), [ssCtrl]);
-  AddKey(ecFoldLevel2, ord('K'), [ssCtrl], Ord('2'), [ssCtrl]);
-  AddKey(ecFoldLevel3, ord('K'), [ssCtrl], Ord('3'), [ssCtrl]);
-  AddKey(ecUnfoldLevel1, ord('K'), [ssCtrl, ssShift], Ord('1'), [ssCtrl, ssShift]);
-  AddKey(ecUnfoldLevel2, ord('K'), [ssCtrl, ssShift], Ord('2'), [ssCtrl, ssShift]);
-  AddKey(ecUnfoldLevel3, ord('K'), [ssCtrl, ssShift], Ord('3'), [ssCtrl, ssShift]);
+  AddKey(ecFoldLevel1, Ord('K'), [ssCtrl], Ord('1'), [ssCtrl]);
+  AddKey(ecFoldLevel2, Ord('K'), [ssCtrl], Ord('2'), [ssCtrl]);
+  AddKey(ecFoldLevel3, Ord('K'), [ssCtrl], Ord('3'), [ssCtrl]);
+  AddKey(ecUnfoldLevel1, Ord('K'), [ssCtrl, ssShift], Ord('1'), [ssCtrl, ssShift]);
+  AddKey(ecUnfoldLevel2, Ord('K'), [ssCtrl, ssShift], Ord('2'), [ssCtrl, ssShift]);
+  AddKey(ecUnfoldLevel3, Ord('K'), [ssCtrl, ssShift], Ord('3'), [ssCtrl, ssShift]);
 //-- CodeFolding
 end;
 
