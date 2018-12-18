@@ -2112,7 +2112,6 @@ begin
 
   if Button = mbLeft then
   begin
-    fMultiCaretController.Flash;
     //I couldn't track down why, but sometimes (and definately not all the time)
     //the block positioning is lost.  This makes sure that the block is
     //maintained in case they started a drag operation on the block
@@ -2173,9 +2172,14 @@ begin
     DoOnGutterClick(Button, X, Y)
   end;
 
-  if (Button = mbLeft) and (ssAlt in Shift) then begin
-    CaretPix := DisplayCoord2CaretXY(CaretDisplay);
-    fMultiCaretController.Carets.Add(CaretPix.X, CaretPix.Y, 0);
+  if (Button = mbLeft) then begin
+    if ssAlt in Shift then begin
+      CaretPix := DisplayCoord2CaretXY(CaretDisplay);
+      fMultiCaretController.Carets.Add(CaretPix.X, CaretPix.Y, 0);
+    end
+    else
+      fMultiCaretController.Carets.Clear;
+    fMultiCaretController.Flash;
   end
   else
     fMultiCaretController.Carets.Clear;
@@ -4847,7 +4851,7 @@ begin
       and (CY >= iClientRect.Top) and (CY < iClientRect.Bottom) then
     begin
       //SetCaretPos(CX, CY);
-      //ShowCaret;
+      // ShowCaret;
       with fMultiCaretController.Carets.DefaultCaret do begin
         PosX := CX;
         PosY := CY;
@@ -6918,6 +6922,7 @@ begin
     UpdateCaret;
   end;
   fMultiCaretController.Shape := TCaretShape.Create(cw, ch, CaretOffset);
+  ShowCaret;
 end;
 
 procedure TCustomSynEdit.SetInsertCaret(const Value: TSynEditCaretType);

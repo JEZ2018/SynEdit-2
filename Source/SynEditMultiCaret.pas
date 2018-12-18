@@ -80,6 +80,7 @@ type
     FList: TList<TCaretItem>;
     FOnChanged: TNotifyEvent;
     FOnBeforeClear: TNotifyEvent;
+    FOnAfterClear: TNotifyEvent;
     FOnBeforeCaretDelete: TNotifyEvent;
     FDefaultCaret: TCaretItem;
     function GetItem(Index: Integer): TCaretItem;
@@ -88,14 +89,14 @@ type
     property OnChanged: TNotifyEvent read FOnChanged write FOnChanged;
     property OnBeforeClear: TNotifyEvent read FOnBeforeClear
       write FOnBeforeClear;
+    property OnAfterClear: TNotifyEvent read FOnAfterClear write FOnAfterClear;
     property OnBeforeCaretDelete: TNotifyEvent read FOnBeforeCaretDelete
       write FOnBeforeCaretDelete;
   public
     constructor Create; virtual;
     destructor Destroy; override;
-    procedure Add(APosX, APosY, ASelLen: Integer);
-    procedure Assign(Other: TCarets);
-    procedure Clear;
+    function Add(APosX, APosY, ASelLen: Integer): TCaretItem;
+    procedure Clear(ExcludeDefaultCaret: Boolean = True);
     procedure Delete(Index: Integer);
     function Count: Integer;
     function InRange(N: Integer): Boolean;
@@ -138,7 +139,7 @@ type
     procedure InvertRects;
     procedure Blink(Sender: TObject);
     procedure DoCaretsChanged(Sender: TObject);
-    procedure DoBeforeCaretsClear(Sender: TObject);
+    procedure DoBeforeAfterCaretsClear(Sender: TObject);
     procedure DoBeforeCaretsDelete(Sender: TObject);
     procedure DoCaretMoved(Sender: TCaretItem; const PointFrom: TPoint;
       const PointTo: TPoint);
@@ -162,36 +163,48 @@ uses Windows;
 
 { TCarets }
 
-procedure TCarets.Add(APosX, APosY, ASelLen: Integer);
-var
-  Caret: TCaretItem;
+function TCarets.Add(APosX, APosY, ASelLen: Integer): TCaretItem;
 begin
-  Caret := TCaretItem.Create(APosX, APosY, ASelLen);
-  FList.Add(Caret);
-  Caret.Index := FList.Count-1;
+  Result := TCaretItem.Create(APosX, APosY, ASelLen);
+  FList.Add(Result);
+  Result.Index := FList.Count-1;
   if Assigned(FOnChanged) then
     FOnChanged(Self)
 end;
 
-procedure TCarets.Assign(Other: TCarets);
-var
-  I: Integer;
-begin
-  Clear;
-  for I := 0 to Other.Count-1 do begin
-    Add(Other[I].PosX, Other[I].PosY, Other[I].SelLen)
-  end;
-end;
-
-procedure TCarets.Clear;
+procedure TCarets.Clear(ExcludeDefaultCaret: Boolean);
 var
   Item: TCaretItem;
+  Def: TCaretItem;
 begin
-  if Assigned(FOnBeforeClear) then
-    FOnBeforeClear(Self);
-  for Item in FList do
-    Item.Free;
-  FList.Clear;
+  if ExcludeDefaultCaret then begin
+    if Count < 2 then
+      Exit;
+    if Assigned(FOnBeforeClear) then
+      FOnBeforeClear(Self);
+    Def := DefaultCaret;
+    for Item in FList do begin
+      if Item <> Def then
+        Item.Free;
+    end;
+    FList.Clear;
+    FList.Add(Def);
+    Def.Index := 0;
+    if Assigned(FOnAfterClear) then
+      FOnAfterClear(Self);
+  end
+  else begin
+    if Count < 1 then
+      Exit;
+    if Assigned(FOnBeforeClear) then
+      FOnBeforeClear(Self);
+    for Item in FList do
+      Item.Free;
+    FList.Clear;
+    FDefaultCaret := nil;
+    if Assigned(FOnAfterClear) then
+      FOnAfterClear(Self);
+  end;
   if Assigned(FOnChanged) then
     FOnChanged(Self)
 end;
@@ -205,8 +218,6 @@ constructor TCarets.Create;
 begin
   inherited;
   FList:= TList<TCaretItem>.Create;
-  FDefaultCaret := TCaretItem.Create;
-  FDefaultCaret.Visible := False;
 end;
 
 procedure TCarets.Delete(Index: Integer);
@@ -217,6 +228,8 @@ begin
   begin
     if Assigned(FOnBeforeCaretDelete) then
       FOnBeforeCaretDelete(FList[Index]);
+    if FList[Index] = FDefaultCaret then
+      FDefaultCaret := nil;
     FList[Index].Free;
     FList.Delete(Index);
     for I := Index to FList.Count-1 do
@@ -229,12 +242,18 @@ end;
 destructor TCarets.Destroy;
 begin
   Clear;
-  FDefaultCaret.Free;
   inherited;
 end;
 
 function TCarets.GetDefaultCaret: TCaretItem;
+var
+  Caret: TCaretItem;
 begin
+  if FList.Count = 0 then begin
+    Caret := Add(0, 0, 0);
+    Caret.Visible := False;
+    FDefaultCaret := Caret;
+  end;
   Result := FDefaultCaret;
 end;
 
@@ -378,10 +397,11 @@ begin
 
   FCarets := TCarets.Create;
   FCarets.OnChanged := DoCaretsChanged;
-  FCarets.OnBeforeClear := DoBeforeCaretsClear;
-  FCarets.DefaultCaret.OnMoved := DoCaretMoved;
+  FCarets.OnBeforeClear := DoBeforeAfterCaretsClear;
+  FCarets.OnAfterClear := DoBeforeAfterCaretsClear;
+{  FCarets.DefaultCaret.OnMoved := DoCaretMoved;
   FCarets.DefaultCaret.OnSelLenChanged := DoCaretSelLenChanged;
-  FCarets.DefaultCaret.OnVisibleChanged := DoCaretVisibleChanged;
+  FCarets.DefaultCaret.OnVisibleChanged := DoCaretVisibleChanged; }
 
   FEditor := Editor;
 end;
@@ -409,7 +429,6 @@ var
   end;
 
 begin
-  ProcessCaret(FCarets.DefaultCaret);
   for Caret in FCarets do
     ProcessCaret(Caret);
 end;
@@ -433,7 +452,7 @@ begin
   end;
 end;
 
-procedure TMultiCaretController.DoBeforeCaretsClear(Sender: TObject);
+procedure TMultiCaretController.DoBeforeAfterCaretsClear(Sender: TObject);
 begin
   if FShown then
     InvertRects;
