@@ -31,6 +31,7 @@ interface
 uses
   Math,
   Graphics,
+  SysUtils,
   ExtCtrls,
   Classes,
   SynEditKeyCmds,
@@ -71,6 +72,8 @@ type
       write FOnSelLenChanged;
     property OnVisibleChanged: TOnVisibleChanged read FOnVisibleChanged
       write FOnVisibleChanged;
+    procedure SaveToStream(S: TStream);
+    function LoadFromStream(S: TStream): Boolean;
   public
     constructor Create; overload;
     constructor Create(PosX, PosY, SelLen: Integer); overload;
@@ -92,6 +95,8 @@ type
   private
     FDefaultCaret: TCaretItem;
     function GetDefaultCaretSafe: TCaretItem;
+    procedure SaveToStream(S: TStream);
+    function LoadFromStream(S: TStream): Boolean;
   protected
     property OnChanged: TNotifyEvent read FOnChanged write FOnChanged;
     property OnBeforeClear: TNotifyEvent read FOnBeforeClear
@@ -112,6 +117,8 @@ type
     function IndexOf(APosX, APosY: Integer): Integer;
     function IsLineListed(APosY: Integer): Boolean;
     function GetEnumerator: TEnumerator<TCaretItem>;
+    function Store: TBytes;
+    function Load(const B: TBytes): Boolean;
   end;
 
   IAbstractEditor = interface
@@ -320,6 +327,92 @@ begin
   end;
 end;
 
+function TCarets.Load(const B: TBytes): Boolean;
+var
+  M: TMemoryStream;
+begin
+  M := TMemoryStream.Create;
+  try
+    M.Write(Pointer(B)^, Length(B));
+    M.Seek(0, soFromBeginning);
+    Result := LoadFromStream(M);
+  finally
+    M.Free
+  end;
+end;
+
+function TCarets.LoadFromStream(S: TStream): Boolean;
+var
+  DefCaretIndex, Count, I, J: Integer;
+  Pos, LastPos: Int64;
+  NewList: TList<TCaretItem>;
+  Caret: TCaretItem;
+begin
+  Result := False;
+  Pos := S.Position;
+  LastPos := S.Seek(0, soFromEnd);
+  if (LastPos - Pos) < (SizeOf(DefCaretIndex) + SizeOf(Count)) then
+    Exit(False);
+  S.Position := Pos;
+  S.Read(DefCaretIndex, SizeOf(DefCaretIndex));
+  S.Read(Count, SizeOf(Count));
+  NewList := TList<TCaretItem>.Create;
+  try
+    try
+      for I := 1 to Count do begin
+        Caret := TCaretItem.Create;
+        if not Caret.LoadFromStream(S) then
+          Abort
+      end;
+      Clear(False);
+      for I := 0 to NewList.Count-1 do begin
+        Caret := NewList[I];
+        FList.Add(Caret);
+        Caret.Index := I;
+        if Caret.Index = DefCaretIndex then
+          FDefaultCaret := Caret;
+      end;
+      Result := True;
+    except on EAbort do
+      for J := 0 to NewList.Count-1 do
+        NewList[J].Free;
+    end;
+  finally
+    NewList.Free
+  end;
+end;
+
+procedure TCarets.SaveToStream(S: TStream);
+var
+  DefCaretIndex, Count, I: Integer;
+  Caret: TCaretItem;
+begin
+  if Assigned(FDefaultCaret) then
+    DefCaretIndex := FDefaultCaret.Index
+  else
+    DefCaretIndex := -1;
+  S.Write(DefCaretIndex, SizeOf(DefCaretIndex));
+  Count := FList.Count;
+  S.Write(Count, SizeOf(Count));
+  for Caret in FList do
+    Caret.SaveToStream(S);
+end;
+
+function TCarets.Store: TBytes;
+var
+  M: TMemoryStream;
+begin
+  M := TMemoryStream.Create;
+  try
+    SaveToStream(M);
+    SetLength(Result, M.Position);
+    M.Seek(0, soFromBeginning);
+    M.Read(Pointer(Result)^, Length(Result))
+  finally
+    M.Free
+  end;
+end;
+
 { TCaretItem }
 
 constructor TCaretItem.Create;
@@ -335,6 +428,22 @@ begin
   FPosX := PosX;
   FPosY := PosY;
   FSelLen := SelLen;
+end;
+
+function TCaretItem.LoadFromStream(S: TStream): Boolean;
+begin
+  Result := (S.Read(FPosX, SizeOf(FPosX)) = SizeOf(FPosX))
+    and (S.Read(FPosY, SizeOf(FPosY)) = SizeOf(FPosY))
+    and (S.Read(FSelLen, SizeOf(FSelLen)) = SizeOf(FSelLen))
+    and (S.Read(FVisible, SizeOf(FVisible)) = SizeOf(FVisible))
+end;
+
+procedure TCaretItem.SaveToStream(S: TStream);
+begin
+  S.Write(FPosX, SizeOf(FPosX));
+  S.Write(FPosY, SizeOf(FPosY));
+  S.Write(FSelLen, SizeOf(FSelLen));
+  S.Write(FVisible, SizeOf(FVisible));
 end;
 
 procedure TCaretItem.SetPosX(const Value: Integer);
