@@ -459,8 +459,8 @@ begin
 
   if not MatchCase then
   begin
-    EditLine := SynWideUpperCase(EditLine);
-    SearchString := SynWideUpperCase(SearchString);
+    EditLine := SysUtils.AnsiUpperCase(EditLine);
+    SearchString := SysUtils.AnsiUpperCase(SearchString);
   end;
 
   BufLen := Length(EditLine);
@@ -596,8 +596,8 @@ var
   begin
     if s <> '' then
     begin
-      s := SynWideLowerCase(s);
-      s[1] := SynWideUpperCase(s[1])[1];
+      s := SysUtils.AnsiLowerCase(s);
+      s[1] := SysUtils.AnsiUpperCase(s[1])[1];
     end;
 
     Result := s;
@@ -621,12 +621,12 @@ begin
         Correction := ReplaceDefText;
         FoundText := Copy(EditLine,StartPos+1,EndPos);
 
-        if FoundText = SynWideUpperCase(FoundText) then
-          Correction := SynWideUpperCase(Correction)
+        if FoundText = SysUtils.AnsiUpperCase(FoundText) then
+          Correction := SysUtils.AnsiUpperCase(Correction)
         else
         begin
-          if FoundText = SynWideLowerCase(FoundText) then
-            Correction := SynWideLowerCase(Correction)
+          if FoundText = SysUtils.AnsiLowerCase(FoundText) then
+            Correction := SysUtils.AnsiLowerCase(Correction)
           else
           begin
             if FoundText = FirstCapCase(FoundText) then

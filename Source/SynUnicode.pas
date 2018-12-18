@@ -113,8 +113,6 @@ function SynCharNext(P: PWideChar): PWideChar; overload;
 function SynCharNext(P: PWideChar; out Element: String): PWideChar; overload;
 function SynUniElementsCount(S: string) : integer;
 
-function SynWideUpperCase(const S: string): string;
-function SynWideLowerCase(const S: string): string;
 function SynIsCharAlpha(const C: WideChar): Boolean;
 function SynIsCharAlphaNumeric(const C: WideChar): Boolean;
 
@@ -204,26 +202,6 @@ begin
     P := Windows.CharNext(P);
     Inc(Result);
   end;
-end;
-
-function SynWideUpperCase(const S: string): string;
-var
-  Len: Integer;
-begin
-  Len := Length(S);
-  SetString(Result, PWideChar(S), Len);
-  if Len > 0 then
-    CharUpperBuff(Pointer(Result), Len);
-end;
-
-function SynWideLowerCase(const S: string): string;
-var
-  Len: Integer;
-begin
-  Len := Length(S);
-  SetString(Result, PWideChar(S), Len);
-  if Len > 0 then
-    CharLowerBuff(Pointer(Result), Len);
 end;
 
 function SynIsCharAlpha(const C: WideChar): Boolean;
