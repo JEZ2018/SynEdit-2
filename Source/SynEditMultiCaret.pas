@@ -33,8 +33,14 @@ uses
   Graphics,
   ExtCtrls,
   Classes,
+  SynEditKeyCmds,
+  SynEditTypes,
   System.Types,
   System.Generics.Collections;
+
+const
+  // Editor commands that will be intercepted and executed in SandBox
+  SANDBOX_COMMANDS: array[0..0] of Integer = (ecChar);
 
 type
 
@@ -82,9 +88,10 @@ type
     FOnBeforeClear: TNotifyEvent;
     FOnAfterClear: TNotifyEvent;
     FOnBeforeCaretDelete: TNotifyEvent;
-    FDefaultCaret: TCaretItem;
     function GetItem(Index: Integer): TCaretItem;
-    function GetDefaultCaret: TCaretItem;
+  private
+    FDefaultCaret: TCaretItem;
+    function GetDefaultCaretSafe: TCaretItem;
   protected
     property OnChanged: TNotifyEvent read FOnChanged write FOnChanged;
     property OnBeforeClear: TNotifyEvent read FOnBeforeClear
@@ -101,7 +108,7 @@ type
     function Count: Integer;
     function InRange(N: Integer): Boolean;
     property Items[N: Integer]: TCaretItem read GetItem; default;
-    property DefaultCaret: TCaretItem read GetDefaultCaret;
+    property DefaultCaret: TCaretItem read GetDefaultCaretSafe;
     function IndexOf(APosX, APosY: Integer): Integer;
     function IsLineListed(APosY: Integer): Boolean;
     function GetEnumerator: TEnumerator<TCaretItem>;
@@ -112,6 +119,11 @@ type
     function GetClientRect: TRect;
     property Canvas: TCanvas read GetCanvas;
     property ClientRect: TRect read GetClientRect;
+    procedure ComputeCaret(X, Y: Integer);
+    procedure RegisterCommandHandler(const AHandlerProc: THookedCommandEvent;
+      AHandlerData: pointer);
+    procedure ExecuteCommand(Command: TSynEditorCommand; AChar: WideChar;
+      Data: pointer);
   end;
 
   TCaretShape = record
@@ -133,6 +145,8 @@ type
     FShown: Boolean;
     FActive: Boolean;
     FShape: TCaretShape;
+    FCommandsList: TList<Integer>;
+    FSandBoxContext: Boolean;
     function CaretPointToRect(const CaretPoint: TPoint): TRect;
     procedure SetActive(const Value: Boolean);
     procedure SetShape(const Value: TCaretShape);
@@ -146,6 +160,13 @@ type
     procedure DoCaretSelLenChanged(Sender: TCaretItem; const ValueFrom: Integer;
       const ValueTo: Integer);
     procedure DoCaretVisibleChanged(Sender: TCaretItem);
+    // Entry point of SandBox for executing commands
+    procedure EditorCommandSandBoxEntryPoint(Sender: TObject;
+      AfterProcessing: Boolean; var Handled: Boolean;
+      var Command: TSynEditorCommand; var AChar: WideChar;
+      Data: pointer; HandlerData: pointer);
+    procedure SandBox(Command: TSynEditorCommand; AChar: WideChar;
+      Data: Pointer);
   public
     constructor Create(Editor: IAbstractEditor);
     destructor Destroy; override;
@@ -245,7 +266,7 @@ begin
   inherited;
 end;
 
-function TCarets.GetDefaultCaret: TCaretItem;
+function TCarets.GetDefaultCaretSafe: TCaretItem;
 var
   Caret: TCaretItem;
 begin
@@ -389,6 +410,9 @@ begin
 end;
 
 constructor TMultiCaretController.Create(Editor: IAbstractEditor);
+var
+  I: Integer;
+
 begin
   FBlinkTimer := TTimer.Create(nil);
   FBlinkTimer.Interval := GetCaretBlinkTime;
@@ -399,11 +423,14 @@ begin
   FCarets.OnChanged := DoCaretsChanged;
   FCarets.OnBeforeClear := DoBeforeAfterCaretsClear;
   FCarets.OnAfterClear := DoBeforeAfterCaretsClear;
-{  FCarets.DefaultCaret.OnMoved := DoCaretMoved;
-  FCarets.DefaultCaret.OnSelLenChanged := DoCaretSelLenChanged;
-  FCarets.DefaultCaret.OnVisibleChanged := DoCaretVisibleChanged; }
+
+  FCommandsList := TList<Integer>.Create;
+  for I := 0 to High(SANDBOX_COMMANDS) do
+    FCommandsList.Add(SANDBOX_COMMANDS[I]);
+  FCommandsList.Sort;
 
   FEditor := Editor;
+  FEditor.RegisterCommandHandler(EditorCommandSandBoxEntryPoint, nil);
 end;
 
 destructor TMultiCaretController.Destroy;
@@ -494,6 +521,23 @@ begin
     InvertRects
 end;
 
+procedure TMultiCaretController.SandBox(Command: TSynEditorCommand;
+  AChar: WideChar; Data: Pointer);
+var
+  DefCaret, ActiveCaret: TCaretItem;
+begin
+  DefCaret := FCarets.FDefaultCaret;
+  try
+    for ActiveCaret in FCarets do begin
+      FCarets.FDefaultCaret := ActiveCaret;
+      FEditor.ComputeCaret(ActiveCaret.PosX, ActiveCaret.PosY);
+      FEditor.ExecuteCommand(Command, AChar, Data);
+    end;
+  finally
+    FCarets.FDefaultCaret := DefCaret;
+  end;
+end;
+
 procedure TMultiCaretController.SetActive(const Value: Boolean);
 begin
   if FActive <> Value then begin
@@ -546,6 +590,24 @@ begin
       if IntersectRect(R2, R, FEditor.GetClientRect) then
         InvertRect(FEditor.GetCanvas.Handle, R);
   end;
+end;
+
+procedure TMultiCaretController.EditorCommandSandBoxEntryPoint(Sender: TObject;
+  AfterProcessing: Boolean; var Handled: Boolean;
+  var Command: TSynEditorCommand; var AChar: WideChar; Data,
+  HandlerData: pointer);
+begin
+  Handled := (not AfterProcessing) and (FCommandsList.IndexOf(Command) <> -1);
+  if Handled then begin
+    if not FSandBoxContext then begin
+      FSandBoxContext := True;
+      try
+        SandBox(Command, AChar, Data);
+      finally
+        FSandBoxContext := False;
+      end;
+    end;
+  end
 end;
 
 procedure TMultiCaretController.Flash;
