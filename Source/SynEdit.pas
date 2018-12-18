@@ -8815,9 +8815,9 @@ begin
     begin
       case Cmd of
         ecUpperCase:
-          w := w.ToUpper(LOCALE_INVARIANT);
+          w := w.ToUpper;
         ecLowerCase:
-          w := w.ToLower(LOCALE_INVARIANT);
+          w := w.ToLower;
         ecToggleCase:
           w := ToggleCase(w);
         ecTitleCase:
