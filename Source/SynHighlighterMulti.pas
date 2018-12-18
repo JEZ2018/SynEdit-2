@@ -965,7 +965,7 @@ end;
 function TScheme.ConvertExpression(const Value: string): string;
 begin
   if not CaseSensitive then
-    Result := SynWideUpperCase(Value)
+    Result := SysUtils.AnsiUpperCase(Value)
   else
     Result := Value;
 end;

@@ -1205,7 +1205,7 @@ procedure TSynCustomHighlighter.DoSetLine(const Value: string; LineNumber: Integ
   begin
     // segregated here so case-insensitive highlighters don't have to pay the overhead
     // of the exception frame for the release of the temporary string
-    dest := SynWideLowerCase(value);
+    dest := SysUtils.AnsiLowerCase(value);
   end;
 
 begin

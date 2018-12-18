@@ -730,7 +730,7 @@ var
 
       if CurChar = '}' then
       begin
-        Command := SynWideUpperCase(Command);
+        Command := SysUtils.AnsiUpperCase(Command);
 
         Data := nil;
         CommandType := fcNoCommand;
@@ -778,14 +778,14 @@ var
         begin
           if (Length(Parameter) = 2)
             and CharInSet(Parameter[1], ['+', '-', '~'])
-            and CharInSet(SynWideUpperCase(Parameter[2])[1],
+            and CharInSet(SysUtils.AnsiUpperCase(Parameter[2])[1],
               ['B', 'I', 'U', 'S']) then
           begin
             CommandType := fcStyle;
             if not (fcStyle in StripCommands) then
             begin
               Data := New(PFormatStyleData);
-              PFormatStyleData(Data)^.Style := SynWideUpperCase(Parameter[2])[1];
+              PFormatStyleData(Data)^.Style := SysUtils.AnsiUpperCase(Parameter[2])[1];
               case Parameter[1] of
               '+': PFormatStyleData(Data)^.Action := 1;
               '-': PFormatStyleData(Data)^.Action := -1;
@@ -1036,7 +1036,7 @@ Begin
         end;
       #3:
         begin
-          if CharInSet(SynWideUpperCase(APrettyText[i + 1])[1], ['B', 'I', 'U']) then
+          if CharInSet(SysUtils.AnsiUpperCase(APrettyText[i + 1])[1], ['B', 'I', 'U']) then
           begin
             Result := Result + '\style{';
 
