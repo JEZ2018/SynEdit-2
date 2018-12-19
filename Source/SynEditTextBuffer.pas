@@ -188,7 +188,8 @@ type
     fChangeStartPos: TBufferCoord;
     fChangeEndPos: TBufferCoord;
     fChangeStr: string;
-    fChangeNumber: integer;                                                     
+    fChangeNumber: integer;
+    fDump: TBytes;
   public
     procedure Assign(Source: TPersistent); override;
     property ChangeReason: TSynChangeReason read fChangeReason;
@@ -197,6 +198,7 @@ type
     property ChangeEndPos: TBufferCoord read fChangeEndPos;
     property ChangeStr: string read fChangeStr;
     property ChangeNumber: integer read fChangeNumber;
+    property Dump: TBytes read fDump;
   end;
 
   TSynEditUndoList = class(TPersistent)
@@ -223,7 +225,9 @@ type
     constructor Create;
     destructor Destroy; override;
     procedure AddChange(AReason: TSynChangeReason; const AStart, AEnd: TBufferCoord;
-      const ChangeText: string; SelMode: TSynSelectionMode);
+      const ChangeText: string; SelMode: TSynSelectionMode); overload;
+    procedure AddChange(AReason: TSynChangeReason; const AStart, AEnd: TBufferCoord;
+      const ChangeText: string; SelMode: TSynSelectionMode; const ADump: TBytes); overload;
     procedure BeginBlock;                                                       
     procedure Clear;
     procedure EndBlock;
@@ -946,6 +950,7 @@ begin
     fChangeEndPos:=TSynEditUndoItem(Source).fChangeEndPos;
     fChangeStr:=TSynEditUndoItem(Source).fChangeStr;
     fChangeNumber:=TSynEditUndoItem(Source).fChangeNumber;
+    fDump:=TSynEditUndoItem(Source).fDump;
   end
   else
     inherited Assign(Source);
@@ -1150,6 +1155,17 @@ begin
     result := crNothing
   else
     result := TSynEditUndoItem(fItems[fItems.Count - 1]).fChangeReason;
+end;
+
+procedure TSynEditUndoList.AddChange(AReason: TSynChangeReason; const AStart,
+  AEnd: TBufferCoord; const ChangeText: string; SelMode: TSynSelectionMode;
+  const ADump: TBytes);
+var
+  NewItem: TSynEditUndoItem;
+begin
+  AddChange(AReason, AStart, AEnd, ChangeText, SelMode);
+  NewItem := TSynEditUndoItem(fItems.Last);
+  NewItem.fDump := ADump;
 end;
 
 procedure TSynEditUndoList.AddGroupBreak;
