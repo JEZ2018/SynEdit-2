@@ -302,7 +302,6 @@ type
   private
     procedure WMCancelMode(var Message: TMessage); message WM_CANCELMODE;
     procedure WMCaptureChanged(var Msg: TMessage); message WM_CAPTURECHANGED;
-    procedure WMChar(var Msg: TWMChar); message WM_CHAR;
     procedure WMClear(var Msg: TMessage); message WM_CLEAR;
     procedure WMCopy(var Message: TMessage); message WM_COPY;
     procedure WMCut(var Message: TMessage); message WM_CUT;
@@ -417,7 +416,6 @@ type
     fOnCommandProcessed: TProcessCommandEvent;
     fOnDropFiles: TDropFilesEvent;
     fOnGutterClick: TGutterClickEvent;
-    FOnKeyPressW: TKeyPressWEvent;
     fOnMouseCursor: TMouseCursorEvent;
     fOnPaint: TPaintEvent;
     fOnPlaceMark: TPlaceMarkEvent;
@@ -585,7 +583,6 @@ type
     procedure DecPaintLock;
     procedure DefineProperties(Filer: TFiler); override;
     procedure DoChange; virtual;
-    procedure DoKeyPressW(var Message: TWMKey);
     //++ Ole Drag & Drop
     procedure OleDragEnter(Sender : TObject; DataObject : IDataObject;
       State : TShiftState; MousePt : TPoint; var Effect: LongInt;
@@ -605,7 +602,6 @@ type
     procedure KeyUp(var Key: Word; Shift: TShiftState); override;
     procedure KeyDown(var Key: Word; Shift: TShiftState); override;
     procedure KeyPress(var Key: Char); override;
-    procedure KeyPressW(var Key: WideChar); virtual;
     procedure LinesChanged(Sender: TObject); virtual;
     procedure ListCleared(Sender: TObject);
     procedure ListDeleted(Sender: TObject; aIndex: Integer; aCount: Integer);
@@ -663,12 +659,10 @@ type
     procedure DoOnClearBookmark(var Mark: TSynEditMark); virtual;
     procedure DoOnCommandProcessed(Command: TSynEditorCommand; AChar: WideChar;
       Data: pointer); virtual;
-    // no method DoOnDropFiles, intercept the WM_DROPFILES instead
     procedure DoOnGutterClick(Button: TMouseButton; X, Y: Integer); virtual;
     procedure DoOnPaint; virtual;
     procedure DoOnPaintTransientEx(TransientType: TTransientType; Lock: Boolean); virtual;
     procedure DoOnPaintTransient(TransientType: TTransientType); virtual;
-
     procedure DoOnPlaceMark(var Mark: TSynEditMark); virtual;
     procedure DoOnProcessCommand(var Command: TSynEditorCommand;
       var AChar: WideChar; Data: pointer); virtual;
@@ -701,7 +695,7 @@ type
     property SelStart: Integer read GetSelStart write SetSelStart;
     property SelEnd: Integer read GetSelEnd write SetSelEnd;
     property AlwaysShowCaret: Boolean read FAlwaysShowCaret
-                                      write SetAlwaysShowCaret;
+      write SetAlwaysShowCaret;
     procedure UpdateCaret;
     procedure AddKey(Command: TSynEditorCommand; Key1: word; SS1: TShiftState;
       Key2: word = 0; SS2: TShiftState = []);
@@ -800,8 +794,8 @@ type
     procedure RemoveKeyUpHandler(aHandler: TKeyEvent);
     procedure AddKeyDownHandler(aHandler: TKeyEvent);
     procedure RemoveKeyDownHandler(aHandler: TKeyEvent);
-    procedure AddKeyPressHandler(aHandler: TKeyPressWEvent);
-    procedure RemoveKeyPressHandler(aHandler: TKeyPressWEvent);
+    procedure AddKeyPressHandler(aHandler: TKeyPressEvent);
+    procedure RemoveKeyPressHandler(aHandler: TKeyPressEvent);
     procedure AddFocusControl(aControl: TWinControl);
     procedure RemoveFocusControl(aControl: TWinControl);
     procedure AddMouseDownHandler(aHandler: TMouseEvent);
@@ -854,6 +848,7 @@ type
     property CharsInWindow: Integer read fCharsInWindow;
     property CharWidth: Integer read fCharWidth;
     property Color;
+    property Cursor default crIBeam;
     property Font: TFont read GetFont write SetFont;
     property Highlighter: TSynCustomHighlighter
       read fHighlighter write SetHighlighter;
@@ -945,7 +940,6 @@ type
       write fOnGutterPaint;
     property OnMouseCursor: TMouseCursorEvent read fOnMouseCursor
       write fOnMouseCursor;
-    property OnKeyPress: TKeyPressWEvent read FOnKeyPressW write FOnKeyPressW;
     property OnPaint: TPaintEvent read fOnPaint write fOnPaint;
     property OnPlaceBookmark: TPlaceMarkEvent
       read FOnPlaceMark write FOnPlaceMark;
@@ -972,7 +966,6 @@ type
     function GetCanvas: TCanvas;
 //-- IAbstractEditor
   published
-    property Cursor default crIBeam;
     property OnSearchNotFound: TCustomSynEditSearchNotFoundEvent
       read fSearchNotFound write fSearchNotFound;
   end;
@@ -986,6 +979,7 @@ type
     property Color;
     property ActiveLineColor;
     property Ctl3D;
+    property Cursor;
     property ParentCtl3D;
     property Enabled;
     property Font;
@@ -1028,6 +1022,7 @@ type
     property BookMarkOptions;
     property BorderStyle;
     property ExtraLineSpacing;
+    property FontSmoothing;
     property Gutter;
     property HideSelection;
     property Highlighter;
@@ -1075,11 +1070,10 @@ type
     property OnPaintTransient;
     property OnTripleClick;
     property OnQuadrupleClick;
+    property OnSearchNotFound;
 //++ CodeFolding
     property OnScanForFoldRanges;
 //-- CodeFolding
-
-    property FontSmoothing;
   end;
 
 implementation
@@ -1857,8 +1851,11 @@ end;
 procedure TCustomSynEdit.KeyUp(var Key: Word; Shift: TShiftState);
 var
   CharCode: Integer;
-  KeyMsg: TWMKey;
 begin
+  { The following allows the entering of Unicode character codes using the
+    Alt + Numpad numbers combination.  When the charcode is less than 256
+    this is handled by Windows.
+  }
   if (ssAlt in Shift) and (Key >= VK_NUMPAD0) and (Key <= VK_NUMPAD9) then
     FCharCodeString := FCharCodeString + IntToStr(Key - VK_NUMPAD0);
 
@@ -1867,11 +1864,7 @@ begin
     if (FCharCodeString <> '') and TryStrToInt(FCharCodeString, CharCode) and
       (CharCode >= 256) and (CharCode <= 65535) then
     begin
-      KeyMsg.Msg := WM_CHAR;
-      KeyMsg.CharCode := CharCode;
-      KeyMsg.Unused := 0;
-      KeyMsg.KeyData := 0;
-      DoKeyPressW(KeyMsg);
+      SendMessage(Handle, WM_CHAR, CharCode, 0);
       FIgnoreNextChar := True;
     end;
     FCharCodeString := '';
@@ -1918,44 +1911,15 @@ end;
 
 procedure TCustomSynEdit.KeyPress(var Key: Char);
 begin
-  // for Windows, don't do anything here
-end;
-
-type
-  TAccessWinControl = class(TWinControl);
-
-{.$MESSAGE 'Check what must be adapted in DoKeyPressW and related methods'}
-procedure TCustomSynEdit.DoKeyPressW(var Message: TWMKey);
-var
-  Form: TCustomForm;
-  Key: WideChar;
-begin
   if FIgnoreNextChar then
   begin
     FIgnoreNextChar := False;
     Exit;
   end;
 
-  Key := WideChar(Message.CharCode);
+  inherited;  // Calls the OnKeyPress event handler if present
+  if Key = #0 then Exit;
 
-  Form := GetParentForm(Self);
-  if (Form <> nil) and (Form <> TWinControl(Self)) and Form.KeyPreview and
-    (Key <= High(AnsiChar)) and TAccessWinControl(Form).DoKeyPress(Message)
-  then
-    Exit;
-  Key := WideChar(Message.CharCode);
-
-  if (csNoStdEvents in ControlStyle) then Exit;
-
-  if Assigned(FOnKeyPressW) then
-    FOnKeyPressW(Self, Key);
-
-  if WideChar(Key) <> #0 then
-    KeyPressW(Key);
-end;
-
-procedure TCustomSynEdit.KeyPressW(var Key: WideChar);
-begin
   // don't fire the event if key is to be ignored
   if not (sfIgnoreNextChar in fStateFlags) then
   begin
@@ -5018,11 +4982,6 @@ procedure TCustomSynEdit.WMCaptureChanged(var Msg: TMessage);
 begin
   fScrollTimer.Enabled := False;
   inherited;
-end;
-
-procedure TCustomSynEdit.WMChar(var Msg: TWMChar);
-begin
-  DoKeyPressW(Msg);
 end;
 
 procedure TCustomSynEdit.WMClear(var Msg: TMessage);
@@ -10214,12 +10173,12 @@ begin
   fKbdHandler.RemoveKeyDownHandler(aHandler);
 end;
 
-procedure TCustomSynEdit.AddKeyPressHandler(aHandler: TKeyPressWEvent);
+procedure TCustomSynEdit.AddKeyPressHandler(aHandler: TKeyPressEvent);
 begin
   fKbdHandler.AddKeyPressHandler(aHandler);
 end;
 
-procedure TCustomSynEdit.RemoveKeyPressHandler(aHandler: TKeyPressWEvent);
+procedure TCustomSynEdit.RemoveKeyPressHandler(aHandler: TKeyPressEvent);
 begin
   fKbdHandler.RemoveKeyPressHandler(aHandler);
 end;
