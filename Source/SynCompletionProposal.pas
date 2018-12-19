@@ -118,7 +118,6 @@ type
   TSynBaseCompletionProposalForm = class(TSynForm)
   private
     FCurrentString: string;
-    FOnKeyPress: TKeyPressWEvent;
     FOnPaintItem: TSynBaseCompletionProposalPaintItem;
     FOnMeasureItem: TSynBaseCompletionProposalMeasureItem;
     FOnChangePosition: TCompletionChange;
@@ -195,17 +194,14 @@ type
     procedure RecalcItemHeight;
     function IsWordBreakChar(AChar: WideChar): Boolean;
   protected
-    procedure DoKeyPressW(Key: WideChar);
     procedure KeyDown(var Key: Word; Shift: TShiftState); override;
     procedure KeyPress(var Key: Char); override;
-    procedure KeyPressW(var Key: WideChar); virtual;
     procedure Paint; override;
     procedure Activate; override;
     procedure Deactivate; override;
     procedure MouseDown(Button: TMouseButton; Shift: TShiftState; X, Y: Integer); override;
     procedure Resize; override;
     procedure Notification(AComponent: TComponent; Operation: TOperation); override;
-    procedure WMChar(var Msg: TWMChar); message WM_CHAR;
     procedure WMMouseWheel(var Msg: TMessage); message WM_MOUSEWHEEL;
     procedure WMActivate (var Message: TWMActivate); message WM_ACTIVATE;
     procedure WMEraseBackgrnd(var Message: TMessage); message WM_ERASEBKGND;
@@ -226,7 +222,7 @@ type
     property CurrentIndex: Integer read FCurrentIndex write FCurrentIndex;
     property CurrentLevel: Integer read FCurrentLevel write FCurrentLevel;
     property OnParameterToken: TCompletionParameter read FParameterToken write FParameterToken;
-    property OnKeyPress: TKeyPressWEvent read FOnKeyPress write FOnKeyPress;
+    property OnKeyPress;
     property OnPaintItem: TSynBaseCompletionProposalPaintItem read FOnPaintItem write FOnPaintItem;
     property OnMeasureItem: TSynBaseCompletionProposalMeasureItem read FOnMeasureItem write FOnMeasureItem;
     property OnValidate: TValidateEvent read FOnValidate write FOnValidate;
@@ -280,7 +276,7 @@ type
     function GetItemList: TStrings;
     function GetInsertList: TStrings;
     function GetOnCancel: TNotifyEvent;
-    function GetOnKeyPress: TKeyPressWEvent;
+    function GetOnKeyPress: TKeyPressEvent;
     function GetOnPaintItem: TSynBaseCompletionProposalPaintItem;
     function GetOnMeasureItem: TSynBaseCompletionProposalMeasureItem;
     function GetOnValidate: TValidateEvent;
@@ -290,7 +286,7 @@ type
     procedure SetInsertList(const Value: TStrings);
     procedure SetNbLinesInWindow(const Value: Integer);
     procedure SetOnCancel(const Value: TNotifyEvent);
-    procedure SetOnKeyPress(const Value: TKeyPressWEvent);
+    procedure SetOnKeyPress(const Value: TKeyPressEvent);
     procedure SetOnPaintItem(const Value: TSynBaseCompletionProposalPaintItem);
     procedure SetOnMeasureItem(const Value: TSynBaseCompletionProposalMeasureItem);
     procedure SetPosition(const Value: Integer);
@@ -353,7 +349,7 @@ type
     procedure AddItem(ADisplayText, AInsertText: string);
     procedure ResetAssignedList;
 
-    property OnKeyPress: TKeyPressWEvent read GetOnKeyPress write SetOnKeyPress;
+    property OnKeyPress: TKeyPressEvent read GetOnKeyPress write SetOnKeyPress;
     property OnValidate: TValidateEvent read GetOnValidate write SetOnValidate;
     property OnCancel: TNotifyEvent read GetOnCancel write SetOnCancel;
     property CurrentString: string read GetCurrentString write SetCurrentString;
@@ -1397,17 +1393,8 @@ end;
 
 procedure TSynBaseCompletionProposalForm.KeyPress(var Key: Char);
 begin
-end;
+  if Key = #0 then Exit;
 
-{.$MESSAGE 'Check what must be adapted in DoKeyPressW and related methods'}
-procedure TSynBaseCompletionProposalForm.DoKeyPressW(Key: WideChar);
-begin
-  if Key <> #0 then
-    KeyPressW(Key);
-end;
-
-procedure TSynBaseCompletionProposalForm.KeyPressW(var Key: WideChar);
-begin
   if DisplayType = ctCode then
   begin
     case Key of
@@ -1438,7 +1425,7 @@ begin
           OnCancel(Self);
     end;
   end;
-  Invalidate; 
+  Invalidate;
 end;
 
 procedure TSynBaseCompletionProposalForm.MouseDown(Button: TMouseButton;
@@ -1935,11 +1922,6 @@ begin
     SendMessage(ParentForm.Handle, WM_NCACTIVATE, Ord(Message.Active <> WA_INACTIVE), 0);
 end;
 
-procedure TSynBaseCompletionProposalForm.WMChar(var Msg: TWMChar);
-begin
-  DoKeyPressW(WideChar(Msg.CharCode))
-end;
-
 procedure TSynBaseCompletionProposalForm.DoFormHide(Sender: TObject);
 begin
   if CurrentEditor <> nil then
@@ -2316,7 +2298,7 @@ begin
   Result := Form.OnCancel;
 end;
 
-function TSynBaseCompletionProposal.GetOnKeyPress: TKeyPressWEvent;
+function TSynBaseCompletionProposal.GetOnKeyPress: TKeyPressEvent;
 begin
   Result := Form.OnKeyPress;
 end;
@@ -2366,7 +2348,7 @@ begin
   Form.OnCancel := Value;
 end;
 
-procedure TSynBaseCompletionProposal.SetOnKeyPress(const Value: TKeyPressWEvent);
+procedure TSynBaseCompletionProposal.SetOnKeyPress(const Value: TKeyPressEvent);
 begin
   Form.OnKeyPress := Value;
 end;

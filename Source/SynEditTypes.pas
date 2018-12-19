@@ -60,8 +60,6 @@ type
 
   TCategoryMethod = function(AChar: WideChar): Boolean of object;
 
-  TKeyPressWEvent = procedure(Sender: TObject; var Key: WideChar) of object;
-
   PSynSelectionMode = ^TSynSelectionMode;
   TSynSelectionMode = (smNormal, smLine, smColumn);
 
