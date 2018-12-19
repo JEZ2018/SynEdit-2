@@ -1843,7 +1843,6 @@ end;
 procedure TCustomSynEdit.KeyUp(var Key: Word; Shift: TShiftState);
 var
   CharCode: Integer;
-//  KeyMsg: TWMKey;
 begin
   { The following allows the entering of Unicode character codes using the
     Alt + Numpad numbers combination.  When the charcode is less than 256
@@ -1858,11 +1857,6 @@ begin
       (CharCode >= 256) and (CharCode <= 65535) then
     begin
       SendMessage(Handle, WM_CHAR, CharCode, 0);
-//      KeyMsg.Msg := WM_CHAR;
-//      KeyMsg.CharCode := CharCode;
-//      KeyMsg.Unused := 0;
-//      KeyMsg.KeyData := 0;
-//      DoKeyPressW(KeyMsg);
       FIgnoreNextChar := True;
     end;
     FCharCodeString := '';
