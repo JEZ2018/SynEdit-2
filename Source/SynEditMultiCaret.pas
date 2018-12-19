@@ -174,6 +174,9 @@ type
       Data: pointer; HandlerData: pointer);
     procedure SandBox(Command: TSynEditorCommand; AChar: WideChar;
       Data: Pointer);
+    {$IFDEF DEBUG}
+    procedure ShowDebugState;
+    {$ENDIF}
   public
     constructor Create(Editor: IAbstractEditor);
     destructor Destroy; override;
@@ -505,7 +508,7 @@ end;
 procedure TMultiCaretController.Blink(Sender: TObject);
 begin
   FShown := not FShown;
-  InvertRects
+  InvertRects;
 end;
 
 function TMultiCaretController.CaretPointToRect(const CaretPoint: TPoint): TRect;
@@ -673,6 +676,26 @@ begin
   end;
 end;
 
+{$IFDEF DEBUG}
+procedure TMultiCaretController.ShowDebugState;
+var
+  Comma: TStringList;
+  I: Integer;
+  S: string;
+begin
+  Comma := TStringList.Create;
+  try
+    Comma.Add(Format('FShown: %s, FActive: %s',
+      [BoolToStr(FShown, True), BoolToStr(FActive, True)]));
+    Comma.Add('Carets: ');
+    S := Comma.CommaText;
+    OutputDebugString(PChar(S));
+  finally
+    Comma.Free;
+  end;
+end;
+{$ENDIF}
+
 procedure TMultiCaretController.DoCaretsChanged(Sender: TObject);
 var
   Caret: TCaretItem;
@@ -725,7 +748,9 @@ end;
 
 procedure TMultiCaretController.Flash;
 begin
+  {$IFDEF DEBUG}
   OutputDebugString('Flash');
+  {$ENDIF}
   if not FShown then begin
     FShown := True;
     InvertRects;
