@@ -256,73 +256,79 @@
         <DelphiCompile Include="..\..\Source\SynEditAutoComplete.pas">
             <BuildOrder>8</BuildOrder>
         </DelphiCompile>
-        <DelphiCompile Include="..\..\Source\SynEditExport.pas">
+        <DelphiCompile Include="..\..\Source\SynEditDataObject.pas">
             <BuildOrder>9</BuildOrder>
         </DelphiCompile>
-        <DelphiCompile Include="..\..\Source\SynEditHighlighter.pas">
+        <DelphiCompile Include="..\..\Source\SynEditDragDrop.pas">
             <BuildOrder>10</BuildOrder>
         </DelphiCompile>
-        <DelphiCompile Include="..\..\Source\SynEditHighlighterOptions.pas">
+        <DelphiCompile Include="..\..\Source\SynEditExport.pas">
             <BuildOrder>11</BuildOrder>
         </DelphiCompile>
-        <DelphiCompile Include="..\..\Source\SynEditKbdHandler.pas">
+        <DelphiCompile Include="..\..\Source\SynEditHighlighter.pas">
             <BuildOrder>12</BuildOrder>
+        </DelphiCompile>
+        <DelphiCompile Include="..\..\Source\SynEditHighlighterOptions.pas">
+            <BuildOrder>13</BuildOrder>
+        </DelphiCompile>
+        <DelphiCompile Include="..\..\Source\SynEditKbdHandler.pas">
+            <BuildOrder>14</BuildOrder>
         </DelphiCompile>
         <DelphiCompile Include="..\..\Source\SynEditKeyCmdEditor.pas">
             <Form>SynEditKeystrokeEditorForm</Form>
             <FormType>dfm</FormType>
-            <BuildOrder>13</BuildOrder>
+            <BuildOrder>15</BuildOrder>
         </DelphiCompile>
         <DelphiCompile Include="..\..\Source\SynEditKeyCmds.pas">
-            <BuildOrder>14</BuildOrder>
+            <BuildOrder>16</BuildOrder>
         </DelphiCompile>
         <DelphiCompile Include="..\..\Source\SynEditKeyCmdsEditor.pas">
             <Form>SynEditKeystrokesEditorForm</Form>
             <FormType>dfm</FormType>
-            <BuildOrder>15</BuildOrder>
-        </DelphiCompile>
-        <DelphiCompile Include="..\..\Source\SynEditKeyConst.pas">
-            <BuildOrder>16</BuildOrder>
-        </DelphiCompile>
-        <DelphiCompile Include="..\..\Source\SynEditMiscClasses.pas">
             <BuildOrder>17</BuildOrder>
         </DelphiCompile>
-        <DelphiCompile Include="..\..\Source\SynEditMiscProcs.pas">
+        <DelphiCompile Include="..\..\Source\SynEditKeyConst.pas">
             <BuildOrder>18</BuildOrder>
+        </DelphiCompile>
+        <DelphiCompile Include="..\..\Source\SynEditMiscClasses.pas">
+            <BuildOrder>19</BuildOrder>
+        </DelphiCompile>
+        <DelphiCompile Include="..\..\Source\SynEditMiscProcs.pas">
+            <BuildOrder>20</BuildOrder>
         </DelphiCompile>
         <DelphiCompile Include="..\..\Source\SynEditOptionsDialog.pas">
             <Form>fmEditorOptionsDialog</Form>
             <FormType>dfm</FormType>
-            <BuildOrder>19</BuildOrder>
-        </DelphiCompile>
-        <DelphiCompile Include="..\..\Source\SynEditPlugins.pas">
-            <BuildOrder>20</BuildOrder>
-        </DelphiCompile>
-        <DelphiCompile Include="..\..\Source\SynEditPrint.pas">
             <BuildOrder>21</BuildOrder>
         </DelphiCompile>
-        <DelphiCompile Include="..\..\Source\SynEditPrinterInfo.pas">
+        <DelphiCompile Include="..\..\Source\SynEditPlugins.pas">
             <BuildOrder>22</BuildOrder>
         </DelphiCompile>
-        <DelphiCompile Include="..\..\Source\SynEditPrintHeaderFooter.pas">
+        <DelphiCompile Include="..\..\Source\SynEditPrint.pas">
             <BuildOrder>23</BuildOrder>
         </DelphiCompile>
-        <DelphiCompile Include="..\..\Source\SynEditPrintMargins.pas">
+        <DelphiCompile Include="..\..\Source\SynEditPrinterInfo.pas">
             <BuildOrder>24</BuildOrder>
+        </DelphiCompile>
+        <DelphiCompile Include="..\..\Source\SynEditPrintHeaderFooter.pas">
+            <BuildOrder>25</BuildOrder>
+        </DelphiCompile>
+        <DelphiCompile Include="..\..\Source\SynEditPrintMargins.pas">
+            <BuildOrder>26</BuildOrder>
         </DelphiCompile>
         <DelphiCompile Include="..\..\Source\SynEditPrintMarginsDialog.pas">
             <Form>SynEditPrintMarginsDlg</Form>
             <FormType>dfm</FormType>
-            <BuildOrder>25</BuildOrder>
-        </DelphiCompile>
-        <DelphiCompile Include="..\..\Source\SynEditPrintPreview.pas">
-            <BuildOrder>26</BuildOrder>
-        </DelphiCompile>
-        <DelphiCompile Include="..\..\Source\SynEditPrintTypes.pas">
             <BuildOrder>27</BuildOrder>
         </DelphiCompile>
-        <DelphiCompile Include="..\..\Source\SynEditPythonBehaviour.pas">
+        <DelphiCompile Include="..\..\Source\SynEditPrintPreview.pas">
+            <BuildOrder>28</BuildOrder>
+        </DelphiCompile>
+        <DelphiCompile Include="..\..\Source\SynEditPrintTypes.pas">
             <BuildOrder>29</BuildOrder>
+        </DelphiCompile>
+        <DelphiCompile Include="..\..\Source\SynEditPythonBehaviour.pas">
+            <BuildOrder>30</BuildOrder>
         </DelphiCompile>
         <DelphiCompile Include="..\..\Source\SynEditRegexSearch.pas">
             <BuildOrder>32</BuildOrder>
@@ -542,9 +548,6 @@
         </DelphiCompile>
         <DelphiCompile Include="..\..\Source\SynMacroRecorder.pas">
             <BuildOrder>103</BuildOrder>
-        </DelphiCompile>
-        <DelphiCompile Include="..\..\Source\SynMemo.pas">
-            <BuildOrder>104</BuildOrder>
         </DelphiCompile>
         <DelphiCompile Include="..\..\Source\SynRegExpr.pas">
             <BuildOrder>105</BuildOrder>
