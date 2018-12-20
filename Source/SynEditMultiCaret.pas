@@ -174,9 +174,6 @@ type
       Data: pointer; HandlerData: pointer);
     procedure SandBox(Command: TSynEditorCommand; AChar: WideChar;
       Data: Pointer);
-    {$IFDEF DEBUG}
-    procedure ShowDebugState;
-    {$ENDIF}
   public
     constructor Create(Editor: IAbstractEditor);
     destructor Destroy; override;
@@ -187,6 +184,9 @@ type
     property Active: Boolean read FActive write SetActive;
     property Carets: TCarets read FCarets;
     property Shape: TCaretShape read FShape write SetShape;
+    {$IFDEF DEBUG}
+    procedure ShowDebugState;
+    {$ENDIF}
   end;
 
 implementation
@@ -680,7 +680,7 @@ end;
 procedure TMultiCaretController.ShowDebugState;
 var
   Comma: TStringList;
-  I: Integer;
+  Caret: TCaretItem;
   S: string;
 begin
   Comma := TStringList.Create;
@@ -688,6 +688,10 @@ begin
     Comma.Add(Format('FShown: %s, FActive: %s',
       [BoolToStr(FShown, True), BoolToStr(FActive, True)]));
     Comma.Add('Carets: ');
+    for Caret in FCarets do begin
+      S := Format('[X: %d; Y: %d]', [Caret.PosX, Caret.PosY]);
+      Comma.Add(S)
+    end;
     S := Comma.CommaText;
     OutputDebugString(PChar(S));
   finally

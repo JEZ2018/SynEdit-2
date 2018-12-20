@@ -2354,7 +2354,7 @@ begin
   nL2 := MinMax(TopLine + (rcClip.Bottom + fTextHeight - 1) div fTextHeight,
     1, DisplayLineCount);
   // Now paint everything while the caret is hidden.
-  HideCaret;
+  // Multicaret>>>  HideCaret;
   try
     // First paint the gutter area if it was (partly) invalidated.
     if (rcClip.Left < fGutterWidth) then
@@ -2375,7 +2375,7 @@ begin
     DoOnPaint;
     DoOnPaintTransient(ttAfter);
   finally
-    UpdateCaret;
+    // Multicaret>>> UpdateCaret(True);
   end;
 end;
 
@@ -4811,8 +4811,6 @@ begin
     if (CX >= iClientRect.Left) and (CX < iClientRect.Right)
       and (CY >= iClientRect.Top) and (CY < iClientRect.Bottom) then
     begin
-      //SetCaretPos(CX, CY);
-      // ShowCaret;
       with fMultiCaretController.Carets.DefaultCaret do begin
         PosX := CX;
         PosY := CY;
@@ -4821,8 +4819,6 @@ begin
     end
     else
     begin
-//      SetCaretPos(CX, CY);
-//      HideCaret;
       with fMultiCaretController.Carets.DefaultCaret do begin
         PosX := CX;
         PosY := CY;
