@@ -3705,6 +3705,7 @@ begin
   finally
     if AddPasteEndMarker then
       fUndoList.AddChange(crPasteEnd, BlockBegin, BlockEnd, '', smNormal);
+    UpdateCaret;
   end;
 
   // ClientRect can be changed by UpdateScrollBars if eoHideShowScrollBars

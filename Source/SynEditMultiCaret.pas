@@ -41,7 +41,7 @@ uses
 
 const
   // Editor commands that will be intercepted and executed in SandBox
-  SANDBOX_COMMANDS: array[0..0] of Integer = (ecChar);
+  SANDBOX_COMMANDS: array[0..1] of Integer = (ecChar, ecPaste);
 
 type
 
@@ -131,6 +131,8 @@ type
       AHandlerData: pointer);
     procedure ExecuteCommand(Command: TSynEditorCommand; AChar: WideChar;
       Data: pointer);
+    procedure BeginUpdate;
+    procedure EndUpdate;
   end;
 
   TCaretShape = record
@@ -164,6 +166,7 @@ type
     procedure DoBeforeCaretsDelete(Sender: TObject);
     procedure DoCaretMoved(Sender: TCaretItem; const PointFrom: TPoint;
       const PointTo: TPoint);
+    procedure DefaultCaretMoved(const PointFrom: TPoint; const PointTo: TPoint);
     procedure DoCaretSelLenChanged(Sender: TCaretItem; const ValueFrom: Integer;
       const ValueTo: Integer);
     procedure DoCaretVisibleChanged(Sender: TCaretItem);
@@ -549,6 +552,24 @@ begin
   FEditor.RegisterCommandHandler(EditorCommandSandBoxEntryPoint, nil);
 end;
 
+procedure TMultiCaretController.DefaultCaretMoved(const PointFrom,
+  PointTo: TPoint);
+var
+  Caret: TCaretItem;
+  Delta: TPoint;
+begin
+  if FSandBoxContext then begin
+    Delta.X := PointTo.X - PointFrom.X;
+    Delta.Y := PointTo.Y - PointFrom.Y;
+    for Caret in FCarets do begin
+      if Caret = Carets.FDefaultCaret then
+        Continue;
+      Caret.PosX := Caret.PosX + Delta.X;
+      Caret.PosY := Caret.PosY + Delta.Y;
+    end;
+  end;
+end;
+
 destructor TMultiCaretController.Destroy;
 begin
   FBlinkTimer.Free;
@@ -629,6 +650,8 @@ begin
     if IntersectRect(R2, RectTo, FEditor.GetClientRect) then
       InvertRect(FEditor.GetCanvas.Handle, RectTo);
   end;
+  if Sender = Carets.FDefaultCaret then
+    DefaultCaretMoved(PointFrom, PointTo);
 end;
 
 procedure TMultiCaretController.Paint;
@@ -643,6 +666,7 @@ var
   DefCaret, ActiveCaret: TCaretItem;
 begin
   DefCaret := FCarets.FDefaultCaret;
+  FEditor.BeginUpdate;
   try
     for ActiveCaret in FCarets do begin
       FCarets.FDefaultCaret := ActiveCaret;
@@ -650,6 +674,7 @@ begin
       FEditor.ExecuteCommand(Command, AChar, Data);
     end;
   finally
+    FEditor.EndUpdate;
     FCarets.FDefaultCaret := DefCaret;
   end;
 end;
