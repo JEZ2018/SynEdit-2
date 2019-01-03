@@ -311,7 +311,7 @@ uses
 
 const
 //++ CodeFolding
-  EditorCommandStrs: array[0..113] of TIdentMapEntry = (
+  EditorCommandStrs: array[0..110] of TIdentMapEntry = (
 //-- CodeFolding
     (Value: ecNone; Name: 'ecNone'),
     (Value: ecLeft; Name: 'ecLeft'),
@@ -330,7 +330,6 @@ const
     (Value: ecPageBottom; Name: 'ecPageBottom'),
     (Value: ecEditorTop; Name: 'ecEditorTop'),
     (Value: ecEditorBottom; Name: 'ecEditorBottom'),
-    (Value: ecGotoXY; Name: 'ecGotoXY'),
     (Value: ecSelLeft; Name: 'ecSelLeft'),
     (Value: ecSelRight; Name: 'ecSelRight'),
     (Value: ecSelUp; Name: 'ecSelUp'),
@@ -347,7 +346,6 @@ const
     (Value: ecSelPageBottom; Name: 'ecSelPageBottom'),
     (Value: ecSelEditorTop; Name: 'ecSelEditorTop'),
     (Value: ecSelEditorBottom; Name: 'ecSelEditorBottom'),
-    (Value: ecSelGotoXY; Name: 'ecSelGotoXY'),
     (Value: ecSelWord; Name: 'ecSelWord'),
     (Value: ecSelectAll; Name: 'ecSelectAll'),
     (Value: ecDeleteLastChar; Name: 'ecDeleteLastChar'),
@@ -361,7 +359,6 @@ const
     (Value: ecLineBreak; Name: 'ecLineBreak'),
     (Value: ecInsertLine; Name: 'ecInsertLine'),
     (Value: ecChar; Name: 'ecChar'),
-    (Value: ecImeStr; Name: 'ecImeStr'),
     (Value: ecUndo; Name: 'ecUndo'),
     (Value: ecRedo; Name: 'ecRedo'),
     (Value: ecCut; Name: 'ecCut'),
