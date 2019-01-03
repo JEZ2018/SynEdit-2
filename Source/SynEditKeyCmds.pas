@@ -485,7 +485,7 @@ end;
 function TSynEditKeyStroke.GetDisplayName: string;
 begin
   Result := EditorCommandToCodeString(Command) + ' - ' + ShortCutToText(ShortCut);
-  if ShortCut <> 0 then
+  if ShortCut2 <> 0 then
     Result := Result + ' ' + ShortCutToText(ShortCut2);
   if Result = '' then
     Result := inherited GetDisplayName;
