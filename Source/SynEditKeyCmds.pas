@@ -311,7 +311,7 @@ uses
 
 const
 //++ CodeFolding
-  EditorCommandStrs: array[0..110] of TIdentMapEntry = (
+  EditorCommandStrs: array[0..113] of TIdentMapEntry = (
 //-- CodeFolding
     (Value: ecNone; Name: 'ecNone'),
     (Value: ecLeft; Name: 'ecLeft'),
@@ -330,6 +330,7 @@ const
     (Value: ecPageBottom; Name: 'ecPageBottom'),
     (Value: ecEditorTop; Name: 'ecEditorTop'),
     (Value: ecEditorBottom; Name: 'ecEditorBottom'),
+    (Value: ecGotoXY; Name: 'ecGotoXY'),
     (Value: ecSelLeft; Name: 'ecSelLeft'),
     (Value: ecSelRight; Name: 'ecSelRight'),
     (Value: ecSelUp; Name: 'ecSelUp'),
@@ -346,6 +347,7 @@ const
     (Value: ecSelPageBottom; Name: 'ecSelPageBottom'),
     (Value: ecSelEditorTop; Name: 'ecSelEditorTop'),
     (Value: ecSelEditorBottom; Name: 'ecSelEditorBottom'),
+    (Value: ecSelGotoXY; Name: 'ecSelGotoXY'),
     (Value: ecSelWord; Name: 'ecSelWord'),
     (Value: ecSelectAll; Name: 'ecSelectAll'),
     (Value: ecDeleteLastChar; Name: 'ecDeleteLastChar'),
@@ -359,6 +361,7 @@ const
     (Value: ecLineBreak; Name: 'ecLineBreak'),
     (Value: ecInsertLine; Name: 'ecInsertLine'),
     (Value: ecChar; Name: 'ecChar'),
+    (Value: ecImeStr; Name: 'ecImeStr'),
     (Value: ecUndo; Name: 'ecUndo'),
     (Value: ecRedo; Name: 'ecRedo'),
     (Value: ecCut; Name: 'ecCut'),
@@ -411,8 +414,8 @@ const
     (Value: ecCopyLineDown; Name:'ecCopyLineDown'),
     (Value: ecMoveLineUp; Name:'ecMoveLineUp'),
     (Value: ecMoveLineDown; Name:'ecMoveLineDown'),
-//++ CodeFolding
     (Value: ecString; Name:'ecString'),
+//++ CodeFolding
     (Value: ecFoldAll; Name:'ecFoldAll'),
     (Value: ecUnfoldAll; Name:'ecUnfoldAll'),
     (Value: ecFoldNearest; Name:'ecFoldNearest'),
@@ -426,12 +429,19 @@ const
     (Value: ecFoldRegions; Name:'ecFoldRanges'),
     (Value: ecUnfoldRegions; Name:'ecUnfoldRanges'));
 //-- CodeFolding
+
+// GetEditorCommandValues and GetEditorCommandExtended for editing key assignments
 procedure GetEditorCommandValues(Proc: TGetStrProc);
 var
   i: integer;
 begin
   for i := Low(EditorCommandStrs) to High(EditorCommandStrs) do
-    Proc(EditorCommandStrs[I].Name);
+    case EditorCommandStrs[I].Value of
+      ecNone, ecChar, ecString, ecImeStr, ecGotoXY, ecSelGotoXY:
+        ;// skip commands that cannot be used by the end-user
+    else
+      Proc(EditorCommandStrs[I].Name);
+    end;
 end;
 
 procedure GetEditorCommandExtended(Proc: TGetStrProc);
@@ -439,7 +449,12 @@ var
   i: integer;
 begin
   for i := Low(EditorCommandStrs) to High(EditorCommandStrs) do
-    Proc(ConvertCodeStringToExtended(EditorCommandStrs[I].Name));
+    case EditorCommandStrs[I].Value of
+      ecNone, ecChar, ecString, ecImeStr, ecGotoXY, ecSelGotoXY:
+        ;// skip commands that cannot be used by the end-user
+    else
+      Proc(ConvertCodeStringToExtended(EditorCommandStrs[I].Name));
+    end;
 end;
 
 function IdentToEditorCommand(const Ident: string; var Cmd: Integer): boolean;
