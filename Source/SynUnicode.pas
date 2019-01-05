@@ -10,8 +10,6 @@ the specific language governing rights and limitations under the License.
 
 The Original Code is SynUnicode.pas by Maël Hörz, released 2004-05-30.
 All Rights Reserved.
-TStrings/TStringList-code (originally written by Mike Lischke) is based
-on JclUnicode.pas which is part of the JCL (www.delphi-jedi.org).
 
 Contributors to the SynEdit and mwEdit projects are listed in the
 Contributors.txt file.
@@ -26,22 +24,15 @@ replace them with the notice and other provisions required by the GPL.
 If you do not delete the provisions above, a recipient may use your version
 of this file under either the MPL or the GPL.
 
-You may retrieve the latest version of this file at the SynEdit home page,
-located at http://SynEdit.SourceForge.net
-
 Provides:
 - Unicode(PWideChar) versions of the most important PAnsiChar-functions in
   SysUtils and some functions unavailable in Delphi 5.
-- An adapted and lighter version of TStrings/TStringList taken
-  from JCL, but made portable.
 - function for loading and saving of Unicode files, and detecting the encoding
 - Unicode clipboard support
 - Unicode-version of TCanvas-methods
 - Some character constants like CR&LF.
 
-Last Changes:
-- 1.1.3.19: Added TStringList.CustomSort
--------------------------------------------------------------------------------}
+------------------------------------------------------------------------------}
 
 unit SynUnicode;
 
@@ -113,18 +104,12 @@ function SynCharNext(P: PWideChar): PWideChar; overload;
 function SynCharNext(P: PWideChar; out Element: String): PWideChar; overload;
 function SynUniElementsCount(S: string) : integer;
 
-function SynIsCharAlpha(const C: WideChar): Boolean;
-function SynIsCharAlphaNumeric(const C: WideChar): Boolean;
-
 { functions taken from JCLUnicode.pas }
 procedure StrSwapByteOrder(Str: PWideChar);
-function UnicodeStringOfChar(C: WideChar; Count: Cardinal): string;
 function CharSetFromLocale(Language: LCID): TFontCharSet;
 function CodePageFromLocale(Language: LCID): Integer;
 function KeyboardCodePage: Word;
 function KeyUnicode(C: AnsiChar): WideChar;
-function StringToUnicodeStringEx(const S: AnsiString; CodePage: Word): string;
-function UnicodeStringToStringEx(const WS: string; CodePage: Word): AnsiString;
 
 { functions providing same behavior on Win9x and WinNT based systems}
 function GetTextSize(DC: HDC; Str: PWideChar; Count: Integer): TSize;
@@ -204,16 +189,6 @@ begin
   end;
 end;
 
-function SynIsCharAlpha(const C: WideChar): Boolean;
-begin
-  Result := IsCharAlphaW(C)
-end;
-
-function SynIsCharAlphaNumeric(const C: WideChar): Boolean;
-begin
-  Result := IsCharAlphaNumericW(C)
-end;
-
 // exchanges in each character of the given string the low order and high order
 // byte to go from LSB to MSB and vice versa.
 // EAX contains address of string
@@ -227,16 +202,6 @@ begin
     P^ := MakeWord(HiByte(P^), LoByte(P^));
     Inc(P);
   end;
-end;
-
-// returns a string of Count characters filled with C
-function UnicodeStringOfChar(C: WideChar; Count: Cardinal): string;
-var
-  I: Integer;
-begin
-  SetLength(Result, Count);
-  for I := 1 to Count do
-    Result[I] := C;
 end;
 
 function TranslateCharsetInfoEx(lpSrc: PDWORD; var lpCs: TCharsetInfo; dwFlags: DWORD): BOOL; stdcall;
@@ -271,32 +236,6 @@ end;
 function KeyUnicode(C: AnsiChar): WideChar;
 begin
   MultiByteToWideChar(KeyboardCodePage, MB_USEGLYPHCHARS, @C, 1, @Result, 1);
-end;
-
-function StringToUnicodeStringEx(const S: AnsiString; CodePage: Word): string;
-var
-  InputLength,
-  OutputLength: Integer;
-begin
-  InputLength := Length(S);
-  OutputLength := MultiByteToWideChar(CodePage, 0, PAnsiChar(S), InputLength,
-    nil, 0);
-  SetLength(Result, OutputLength);
-  MultiByteToWideChar(CodePage, 0, PAnsiChar(S), InputLength, PWideChar(Result),
-    OutputLength);
-end;
-
-function UnicodeStringToStringEx(const WS: string; CodePage: Word): AnsiString;
-var
-  InputLength,
-  OutputLength: Integer;
-begin
-  InputLength := Length(WS);
-  OutputLength := WideCharToMultiByte(CodePage, 0, PWideChar(WS), InputLength,
-    nil, 0, nil, nil);
-  SetLength(Result, OutputLength);
-  WideCharToMultiByte(CodePage, 0, PWideChar(WS), InputLength, PAnsiChar(Result),
-    OutputLength, nil, nil);
 end;
 
 function GetTextSize(DC: HDC; Str: PWideChar; Count: Integer): TSize;

@@ -278,7 +278,7 @@ begin
           // indent lines
           if (IndentLen > 0) and (Temp.Count > 1) then
           begin
-            s := UnicodeStringOfChar(' ', IndentLen);
+            s := StringofChar(' ', IndentLen);
             for i := 1 to Temp.Count - 1 do
               Temp[i] := s + Temp[i];
           end;

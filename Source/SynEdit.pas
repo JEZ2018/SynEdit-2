@@ -1952,10 +1952,10 @@ end;
 function TCustomSynEdit.GetLeftSpacing(CharCount: Integer; WantTabs: Boolean): string;
 begin
   if WantTabs and not(eoTabsToSpaces in Options) and (CharCount >= TabWidth) then
-    Result := UnicodeStringOfChar(#9, CharCount div TabWidth) +
-      UnicodeStringOfChar(#32, CharCount mod TabWidth)
+    Result := StringofChar(#9, CharCount div TabWidth) +
+      StringofChar(#32, CharCount mod TabWidth)
   else
-    Result := UnicodeStringOfChar(#32, CharCount);
+    Result := StringofChar(#32, CharCount);
 end;
 
 procedure TCustomSynEdit.LinesChanging(Sender: TObject);
@@ -4268,7 +4268,7 @@ var
       sLeftSide := Copy(LineText, 1, CaretX - 1);
       if CaretX - 1 > Length(sLeftSide) then
       begin
-        sLeftSide := sLeftSide + UnicodeStringOfChar(#32,
+        sLeftSide := sLeftSide + StringofChar(#32,
           CaretX - 1 - Length(sLeftSide));
       end;
       sRightSide := Copy(LineText, CaretX, Length(LineText) - (CaretX - 1));
@@ -4342,7 +4342,7 @@ var
           if CaretY > Lines.Count then
           begin
             Inc(Result);
-            TempString := UnicodeStringOfChar(#32, InsertPos - 1) + Str;
+            TempString := StringofChar(#32, InsertPos - 1) + Str;
             Lines.Add('');
             if AddToUndoList then
             begin
@@ -4357,7 +4357,7 @@ var
             if Len < InsertPos then
             begin
               TempString :=
-                TempString + UnicodeStringOfChar(#32, InsertPos - Len - 1) + Str
+                TempString + StringofChar(#32, InsertPos - Len - 1) + Str
             end
             else
                 Insert(Str, TempString, InsertPos);
@@ -6332,7 +6332,7 @@ begin
             if (Length(TmpStr) < CaretX - 1)
               and (LeftSpaces(Item.ChangeStr) = 0)
             then
-              TmpStr := TmpStr + UnicodeStringOfChar(#32, CaretX - 1 - Length(TmpStr));
+              TmpStr := TmpStr + StringofChar(#32, CaretX - 1 - Length(TmpStr));
             ProperSetLine(CaretY - 1, TmpStr + Item.ChangeStr);
             Lines.Delete(Item.ChangeEndPos.Line);
           end
@@ -7298,7 +7298,7 @@ begin
               // join line with the line after
               if CaretY < Lines.Count then
               begin
-                Helper := UnicodeStringOfChar(#32, CaretX - 1 - Len);
+                Helper := StringofChar(#32, CaretX - 1 - Len);
                 Lines[CaretY - 1] := Temp + Helper + Lines[CaretY];
                 Caret.Char := 1;
                 Caret.Line := CaretY + 1;
@@ -7491,7 +7491,7 @@ begin
             if Len < CaretX then
             begin
               if (Len > 0) then
-                SpaceBuffer := UnicodeStringOfChar(#32, CaretX - Len - Ord(fInserting))
+                SpaceBuffer := StringofChar(#32, CaretX - Len - Ord(fInserting))
               else
                 SpaceBuffer := GetLeftSpacing(CaretX - Len - Ord(fInserting), True);
               SpaceCount2 := Length(SpaceBuffer);
@@ -7693,7 +7693,7 @@ begin
             Temp := LineText;
             Len := Length(Temp);
             if Len < CaretX then
-              Temp := Temp + UnicodeStringOfChar(#32, CaretX - Len - 1);
+              Temp := Temp + StringofChar(#32, CaretX - Len - 1);
             bChangeScroll := not (eoScrollPastEol in fOptions);
             try
               if bChangeScroll then Include(fOptions, eoScrollPastEol);
@@ -8880,7 +8880,7 @@ begin
 
     if eoTabsToSpaces in fOptions then
     begin
-      Spaces := UnicodeStringOfChar(#32, i);
+      Spaces := StringOfChar(#32, i);
       NewCaretX := StartOfBlock.Char + i;
     end
     else begin
@@ -8908,7 +8908,7 @@ begin
             Dec(nDistanceToTab, TabWidth);
           end;
           if nDistanceToTab > 0 then
-            Spaces := Spaces + UnicodeStringOfChar(#32, nDistanceToTab);
+            Spaces := Spaces + StringofChar(#32, nDistanceToTab);
         end else
           Spaces := #9;
       end
@@ -9229,7 +9229,7 @@ begin
       //               chars per line * lines-1    + last line + null char
       StrToInsert := WideStrAlloc(InsertStrLen);
       Run := StrToInsert;
-      Spaces := UnicodeStringOfChar(#32, FTabWidth);
+      Spaces := StringofChar(#32, FTabWidth);
     end
     else begin
       InsertStrLen:= 3 * (e - BB.Line) + 2;
@@ -9344,7 +9344,7 @@ begin
        //And must not increment 'Line' pointer by more than its 'Length'
        if fActiveSelectionMode = smColumn then
          Inc(Line, MinIntValue([BB.Char - 1, BE.Char - 1, Length(Lines[i - 1])]));
-       //Instead of doing a UnicodeStringOfChar, we need to get *exactly* what was
+       //Instead of doing a StringofChar, we need to get *exactly* what was
        //being deleted incase there is a TabChar
        TmpDelLen := GetDelLen;
        StrCat(StrToDelete, PWideChar(Copy(Line, 1, TmpDelLen)));
