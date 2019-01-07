@@ -212,8 +212,6 @@ type
       Shift: TShiftState; X, Y: Integer);
     procedure btnGutterColorMouseDown(Sender: TObject;
       Button: TMouseButton; Shift: TShiftState; X, Y: Integer);
-    procedure cKeyCommandExit(Sender: TObject);
-    procedure cKeyCommandKeyPress(Sender: TObject; var Key: Char);
     procedure cKeyCommandKeyUp(Sender: TObject; var Key: Word;
       Shift: TShiftState);
     procedure KeyListChanging(Sender: TObject; Item: TListItem;
@@ -799,6 +797,7 @@ end;
 procedure TfmEditorOptionsDialog.btnAddKeyClick(Sender: TObject);
 var Item : TListItem;
 begin
+  if cKeyCommand.ItemIndex < 0 then Exit;
   Item:= KeyList.Items.Add;
   Item.Data:= FSynEdit.Keystrokes.Add;
   Item.Selected:= True;
@@ -928,44 +927,7 @@ begin
       TmpString := TmpString + ' ' + ShortCutToText(ShortCut2);
 
     AItem.SubItems.Add(TmpString);
-
   end;
-
-end;
-
-procedure TfmEditorOptionsDialog.cKeyCommandExit(Sender: TObject);
-VAR TmpIndex : Integer;
-begin
-  TmpIndex := cKeyCommand.Items.IndexOf(cKeyCommand.Text);
-  if TmpIndex = -1 then
-  begin
-    if FExtended then
-      cKeyCommand.ItemIndex := cKeyCommand.Items.IndexOf(ConvertCodeStringToExtended('ecNone'))
-    else cKeyCommand.ItemIndex := cKeyCommand.Items.IndexOf('ecNone');
-  end else cKeyCommand.ItemIndex := TmpIndex;  //need to force it incase they just typed something in
-
-end;
-
-procedure TfmEditorOptionsDialog.cKeyCommandKeyPress(Sender: TObject;
-  var Key: Char);
-var WorkStr : string;
-    i       : Integer;
-begin
-//This would be better if componentized, but oh well...
-  WorkStr := Uppercase(Copy(cKeyCommand.Text, 1, cKeyCommand.SelStart) + Key);
-  i := 0;
-  While i < cKeyCommand.Items.Count do
-  begin
-    if pos(WorkStr, Uppercase(cKeyCommand.Items[i])) = 1 then
-    begin
-      cKeyCommand.Text := cKeyCommand.Items[i];
-      cKeyCommand.SelStart := length(WorkStr);
-      cKeyCommand.SelLength := Length(cKeyCommand.Text) - cKeyCommand.SelStart;
-      Key := #0;
-      break;
-    end else inc(i);
-  end;
-
 end;
 
 procedure TfmEditorOptionsDialog.cKeyCommandKeyUp(Sender: TObject;

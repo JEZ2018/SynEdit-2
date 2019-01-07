@@ -378,7 +378,7 @@ begin
              I := Run + 1;
              while fLine[I] = ' ' do
                Inc(I);
-             if (AnsiStrLComp(PWideChar(@fLine[I]), PWideChar(UnicodeStringOfChar(StringChars[fRange], 2)), 2) <> 0)
+             if (AnsiStrLComp(PWideChar(@fLine[I]), PWideChar(StringofChar(StringChars[fRange], 2)), 2) <> 0)
                or (I + 1 > fCodeEndPos) then
                  fRange := rsUnknown;
            end;

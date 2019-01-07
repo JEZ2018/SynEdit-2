@@ -22,7 +22,7 @@ object fmEditorOptionsDialog: TfmEditorOptionsDialog
     Top = 8
     Width = 355
     Height = 345
-    ActivePage = Options
+    ActivePage = Keystrokes
     TabOrder = 0
     object Display: TTabSheet
       Caption = 'Display'
@@ -677,9 +677,8 @@ object fmEditorOptionsDialog: TfmEditorOptionsDialog
           Top = 23
           Width = 186
           Height = 21
+          Style = csDropDownList
           TabOrder = 0
-          OnExit = cKeyCommandExit
-          OnKeyPress = cKeyCommandKeyPress
           OnKeyUp = cKeyCommandKeyUp
         end
       end

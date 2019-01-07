@@ -310,7 +310,7 @@ uses
 
 const
 //++ CodeFolding
-  EditorCommandStrs: array[0..113] of TIdentMapEntry = (
+  EditorCommandStrs: array[0..112] of TIdentMapEntry = (
 //-- CodeFolding
     (Value: ecNone; Name: 'ecNone'),
     (Value: ecLeft; Name: 'ecLeft'),
@@ -383,7 +383,6 @@ const
     (Value: ecColumnSelect; Name: 'ecColumnSelect'),
     (Value: ecLineSelect; Name: 'ecLineSelect'),
     (Value: ecAutoCompletion; Name: 'ecAutoCompletion'),
-    (Value: ecUserFirst; Name: 'ecUserFirst'),
     (Value: ecContextHelp; Name: 'ecContextHelp'),
     (Value: ecGotoMarker0; Name: 'ecGotoMarker0'),
     (Value: ecGotoMarker1; Name: 'ecGotoMarker1'),
@@ -413,8 +412,8 @@ const
     (Value: ecCopyLineDown; Name:'ecCopyLineDown'),
     (Value: ecMoveLineUp; Name:'ecMoveLineUp'),
     (Value: ecMoveLineDown; Name:'ecMoveLineDown'),
-//++ CodeFolding
     (Value: ecString; Name:'ecString'),
+//++ CodeFolding
     (Value: ecFoldAll; Name:'ecFoldAll'),
     (Value: ecUnfoldAll; Name:'ecUnfoldAll'),
     (Value: ecFoldNearest; Name:'ecFoldNearest'),
@@ -428,12 +427,19 @@ const
     (Value: ecFoldRegions; Name:'ecFoldRanges'),
     (Value: ecUnfoldRegions; Name:'ecUnfoldRanges'));
 //-- CodeFolding
+
+// GetEditorCommandValues and GetEditorCommandExtended for editing key assignments
 procedure GetEditorCommandValues(Proc: TGetStrProc);
 var
   i: integer;
 begin
   for i := Low(EditorCommandStrs) to High(EditorCommandStrs) do
-    Proc(EditorCommandStrs[I].Name);
+    case EditorCommandStrs[I].Value of
+      ecNone, ecChar, ecString, ecImeStr, ecGotoXY, ecSelGotoXY:
+        ;// skip commands that cannot be used by the end-user
+    else
+      Proc(EditorCommandStrs[I].Name);
+    end;
 end;
 
 procedure GetEditorCommandExtended(Proc: TGetStrProc);
@@ -441,7 +447,12 @@ var
   i: integer;
 begin
   for i := Low(EditorCommandStrs) to High(EditorCommandStrs) do
-    Proc(ConvertCodeStringToExtended(EditorCommandStrs[I].Name));
+    case EditorCommandStrs[I].Value of
+      ecNone, ecChar, ecString, ecImeStr, ecGotoXY, ecSelGotoXY:
+        ;// skip commands that cannot be used by the end-user
+    else
+      Proc(ConvertCodeStringToExtended(EditorCommandStrs[I].Name));
+    end;
 end;
 
 function IdentToEditorCommand(const Ident: string; var Cmd: Integer): boolean;
@@ -484,7 +495,7 @@ end;
 function TSynEditKeyStroke.GetDisplayName: string;
 begin
   Result := EditorCommandToCodeString(Command) + ' - ' + ShortCutToText(ShortCut);
-  if ShortCut <> 0 then
+  if ShortCut2 <> 0 then
     Result := Result + ' ' + ShortCutToText(ShortCut2);
   if Result = '' then
     Result := inherited GetDisplayName;

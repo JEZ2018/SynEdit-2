@@ -477,8 +477,8 @@ begin
   {FTestString is used to Calculate MaxWidth when prewiewing and printing -
    else the length is not calculated correctly when prewiewing and the
    zoom is different from 0.25,0.5,1,2,4 (as for example 1.20) - WHY???}
-//  fTestString := UnicodeStringOfChar('W', FMaxCol);
-  AStr := UnicodeStringOfChar('W', FMaxCol);
+//  fTestString := StringofChar('W', FMaxCol);
+  AStr := StringofChar('W', FMaxCol);
   FMaxWidth := FCanvas.TextWidth(AStr);
   FPageCount := 1;
   PageLine := TPageLine.Create;
