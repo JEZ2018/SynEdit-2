@@ -35,6 +35,7 @@ uses
   ExtCtrls,
   Classes,
   SynEditKeyCmds,
+  SynEditTextBuffer,
   SynEditTypes,
   System.Types,
   System.Generics.Collections;
@@ -110,6 +111,7 @@ type
     function Add(APosX, APosY, ASelLen: Integer): TCaretItem;
     procedure Clear(ExcludeDefaultCaret: Boolean = True);
     procedure Delete(Index: Integer);
+    procedure Sort;
     function Count: Integer;
     function InRange(N: Integer): Boolean;
     property Items[N: Integer]: TCaretItem read GetItem; default;
@@ -124,8 +126,10 @@ type
   IAbstractEditor = interface
     function GetCanvas: TCanvas;
     function GetClientRect: TRect;
+    function GetUndoList: TSynEditUndoList;
     property Canvas: TCanvas read GetCanvas;
     property ClientRect: TRect read GetClientRect;
+    property UndoList: TSynEditUndoList read GetUndoList;
     procedure ComputeCaret(X, Y: Integer);
     procedure RegisterCommandHandler(const AHandlerProc: THookedCommandEvent;
       AHandlerData: pointer);
@@ -189,11 +193,13 @@ type
     property Shape: TCaretShape read FShape write SetShape;
     {$IFDEF DEBUG}
     procedure ShowDebugState;
+    procedure InvertShown;
     {$ENDIF}
   end;
 
 implementation
-uses Windows;
+uses Windows, System.Generics.Defaults;
+
 
 { TCarets }
 
@@ -408,6 +414,22 @@ begin
     Caret.SaveToStream(S);
 end;
 
+procedure TCarets.Sort;
+var
+  Comparison: TComparison<TCaretItem>;
+
+begin
+  Comparison :=
+  function(const Left, Right: TCaretItem): Integer
+  begin
+    Result := Left.PosX - Right.PosX;
+    if Result = 0 then
+      Result := Left.PosY - Right.PosY
+  end;
+
+  FList.Sort(TComparer<TCaretItem>.Construct(Comparison));
+end;
+
 function TCarets.Store: TBytes;
 var
   M: TMemoryStream;
@@ -598,6 +620,11 @@ begin
 end;
 
 
+procedure TMultiCaretController.InvertShown;
+begin
+  FShown := not FShown
+end;
+
 procedure TMultiCaretController.MoveX(Delta: Integer);
 var
   Caret: TCaretItem;
@@ -667,6 +694,8 @@ var
 begin
   DefCaret := FCarets.FDefaultCaret;
   FEditor.BeginUpdate;
+  //FCarets.Sort;
+  FEditor.UndoList.AddMultiCaretChange(FCarets.Store);
   try
     for ActiveCaret in FCarets do begin
       FCarets.FDefaultCaret := ActiveCaret;
@@ -714,7 +743,7 @@ begin
       [BoolToStr(FShown, True), BoolToStr(FActive, True)]));
     Comma.Add('Carets: ');
     for Caret in FCarets do begin
-      S := Format('[X: %d; Y: %d]', [Caret.PosX, Caret.PosY]);
+      S := Format('[X: %d; Y: %d; Visible: %s]', [Caret.PosX, Caret.PosY, BoolToStr(Caret.Visible, True)]);
       Comma.Add(S)
     end;
     S := Comma.CommaText;

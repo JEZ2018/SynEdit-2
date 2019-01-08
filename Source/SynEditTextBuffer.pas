@@ -173,7 +173,7 @@ type
     crAutoCompleteBegin, crAutoCompleteEnd,
     crPasteBegin, crPasteEnd, // for pasting, since it might do a lot of operations
     crSpecialBegin, crSpecialEnd,
-    crCaret,      // just restore the Caret, allowing better Undo behavior
+    crCaret, crMultiCaret,    // just restore the Caret, allowing better Undo behavior
     crSelection,  // restore Selection
     crNothing,    // can be used to break group undo
     crGroupBreak,
@@ -189,7 +189,7 @@ type
     fChangeEndPos: TBufferCoord;
     fChangeStr: string;
     fChangeNumber: integer;
-    fDump: TBytes;
+    fMultiCaretDump: TBytes;
   public
     procedure Assign(Source: TPersistent); override;
     property ChangeReason: TSynChangeReason read fChangeReason;
@@ -198,7 +198,7 @@ type
     property ChangeEndPos: TBufferCoord read fChangeEndPos;
     property ChangeStr: string read fChangeStr;
     property ChangeNumber: integer read fChangeNumber;
-    property Dump: TBytes read fDump;
+    property MultiCaretDump: TBytes read fMultiCaretDump;
   end;
 
   TSynEditUndoList = class(TPersistent)
@@ -226,8 +226,7 @@ type
     destructor Destroy; override;
     procedure AddChange(AReason: TSynChangeReason; const AStart, AEnd: TBufferCoord;
       const ChangeText: string; SelMode: TSynSelectionMode); overload;
-    procedure AddChange(AReason: TSynChangeReason; const AStart, AEnd: TBufferCoord;
-      const ChangeText: string; SelMode: TSynSelectionMode; const ADump: TBytes); overload;
+    procedure AddMultiCaretChange(const AMultiCaretDump: TBytes);
     procedure BeginBlock;                                                       
     procedure Clear;
     procedure EndBlock;
@@ -950,7 +949,7 @@ begin
     fChangeEndPos:=TSynEditUndoItem(Source).fChangeEndPos;
     fChangeStr:=TSynEditUndoItem(Source).fChangeStr;
     fChangeNumber:=TSynEditUndoItem(Source).fChangeNumber;
-    fDump:=TSynEditUndoItem(Source).fDump;
+    fMultiCaretDump:=TSynEditUndoItem(Source).fMultiCaretDump;
   end
   else
     inherited Assign(Source);
@@ -1157,17 +1156,6 @@ begin
     result := TSynEditUndoItem(fItems[fItems.Count - 1]).fChangeReason;
 end;
 
-procedure TSynEditUndoList.AddChange(AReason: TSynChangeReason; const AStart,
-  AEnd: TBufferCoord; const ChangeText: string; SelMode: TSynSelectionMode;
-  const ADump: TBytes);
-var
-  NewItem: TSynEditUndoItem;
-begin
-  AddChange(AReason, AStart, AEnd, ChangeText, SelMode);
-  NewItem := TSynEditUndoItem(fItems.Last);
-  NewItem.fDump := ADump;
-end;
-
 procedure TSynEditUndoList.AddGroupBreak;
 var
   vDummy: TBufferCoord;
@@ -1178,6 +1166,17 @@ begin
   begin
     AddChange(crGroupBreak, vDummy, vDummy, '', smNormal);
   end;
+end;
+
+procedure TSynEditUndoList.AddMultiCaretChange(const AMultiCaretDump: TBytes);
+const
+  cEmptyCoord: TBufferCoord = (Char: 0; Line: 0);
+var
+  NewItem: TSynEditUndoItem;
+begin
+  AddChange(crMultiCaret, cEmptyCoord, cEmptyCoord, '', smNormal);
+  NewItem := TSynEditUndoItem(fItems.Last);
+  NewItem.fMultiCaretDump := AMultiCaretDump;
 end;
 
 procedure TSynEditUndoList.SetInitialState(const Value: boolean);

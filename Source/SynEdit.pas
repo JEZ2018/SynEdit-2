@@ -487,6 +487,7 @@ type
     function GetWordAtCursor: string;
     function GetWordAtMouse: string;
     function GetWordWrap: Boolean;
+    function GetUndoList: TSynEditUndoList;
     procedure GutterChanged(Sender: TObject);
     function LeftSpaces(const Line: string): Integer;
 //++ CodeFolding
@@ -1681,6 +1682,11 @@ begin
         end;
     end;
   end;
+end;
+
+function TCustomSynEdit.GetUndoList: TSynEditUndoList;
+begin
+  Result := fUndoList;
 end;
 
 function TCustomSynEdit.SynGetText: string;
@@ -6255,7 +6261,9 @@ begin
         if Item = nil then
           FKeepGoing := False
         else begin
-          if FAutoComplete then
+          if Item.ChangeReason = crMultiCaret then
+            FKeepGoing := True
+          else if FAutoComplete then
              FKeepGoing := (FUndoList.LastChangeReason <> crAutoCompleteBegin)
           else if FPasteAction then
              FKeepGoing := (FUndoList.LastChangeReason <> crPasteBegin)
@@ -6268,7 +6276,8 @@ begin
               (FLastChange = Item.ChangeReason) and
               not(FLastChange in [crIndent, crUnindent]));
           end;
-          FLastChange := Item.ChangeReason;
+          if Item.ChangeReason <> crMultiCaret then
+            FLastChange := Item.ChangeReason;
         end;
       until not(FKeepGoing);
 
@@ -6308,6 +6317,11 @@ begin
         begin
           fRedoList.AddChange(Item.ChangeReason, CaretXY, CaretXY, '', fActiveSelectionMode);
           InternalCaretXY := Item.ChangeStartPos;
+        end;
+      crMultiCaret:
+        begin
+          fMultiCaretController.Carets.Load(Item.MultiCaretDump);
+          fMultiCaretController.Flash;
         end;
       crSelection:
         begin
