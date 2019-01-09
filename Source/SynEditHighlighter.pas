@@ -76,8 +76,8 @@ type
       OldStyle: Boolean): Boolean; virtual;
     function LoadFromRegistry(Reg: TBetterRegistry): Boolean;
     function SaveToRegistry(Reg: TBetterRegistry): Boolean;
-    function LoadFromFile(Ini: TIniFile): Boolean;
-    function SaveToFile(Ini: TIniFile): Boolean;
+    function LoadFromFile(Ini: TCustomIniFile): Boolean;
+    function SaveToFile(Ini: TCustomIniFile): Boolean;
   public
     procedure SetColors(Foreground, Background: TColor);
     property FriendlyName: string read fFriendlyName;
@@ -680,7 +680,7 @@ begin
     Result := False;
 end;
 
-function TSynHighlighterAttributes.LoadFromFile(Ini : TIniFile): boolean;
+function TSynHighlighterAttributes.LoadFromFile(Ini: TCustomIniFile): Boolean;
 var
   S: TStringList;
 begin
@@ -704,7 +704,7 @@ begin
   end;
 end;
 
-function TSynHighlighterAttributes.SaveToFile(Ini : TIniFile): boolean;
+function TSynHighlighterAttributes.SaveToFile(Ini: TCustomIniFile): Boolean;
 begin
   Ini.WriteInteger(Name, 'Background', Background);
   Ini.WriteInteger(Name, 'Foreground', Foreground);
@@ -872,10 +872,10 @@ end;
 
 function TSynCustomHighlighter.LoadFromFile(AFileName : String): boolean;
 var
-  AIni: TIniFile;
+  AIni: TMemIniFile;
   i: Integer;
 begin
-  AIni := TIniFile.Create(AFileName);
+  AIni := TMemIniFile.Create(AFileName);
   try
     with AIni do
     begin
@@ -890,10 +890,10 @@ end;
 
 function TSynCustomHighlighter.SaveToFile(AFileName : String): boolean;
 var
-  AIni: TIniFile;
+  AIni: TMemIniFile;
   i: integer;
 begin
-  AIni := TIniFile.Create(AFileName);
+  AIni := TMemIniFile.Create(AFileName);
   try
     with AIni do
     begin
@@ -902,6 +902,7 @@ begin
         Result := Attribute[i].SaveToFile(AIni) and Result;
     end;
   finally
+    AIni.UpdateFile;
     AIni.Free;
   end;
 end;

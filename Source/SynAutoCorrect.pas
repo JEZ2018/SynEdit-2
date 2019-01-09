@@ -255,9 +255,9 @@ procedure TCustomSynAutoCorrect.LoadFromIni(AFileName, ASection: string);
 var
   i: Integer;
   Original, Correction: string;
-  Reg: TIniFile;
+  Reg: TMemIniFile;
 begin
-  Reg := TIniFile.Create(AFileName);
+  Reg := TMemIniFile.Create(AFileName);
   try
     FItems.Clear;
     with Reg do
@@ -276,9 +276,9 @@ end;
 procedure TCustomSynAutoCorrect.SaveToIni(AFileName, ASection: string);
 var
   i: Integer;
-  Reg: TIniFile;
+  Reg: TMemIniFile;
 begin
-  Reg := TIniFile.Create(AFileName);
+  Reg := TMemIniFile.Create(AFileName);
   try
     with Reg do
     begin
@@ -292,6 +292,7 @@ begin
       end;
     end;
   finally
+    Reg.UpdateFile;
     Reg.Free;
   end;
 end;
