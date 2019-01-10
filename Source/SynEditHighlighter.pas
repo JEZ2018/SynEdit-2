@@ -197,6 +197,8 @@ type
     procedure EnumUserSettings(Settings: TStrings); virtual;
     function LoadFromRegistry(RootKey: HKEY; Key: string): Boolean; virtual;
     function SaveToRegistry(RootKey: HKEY; Key: string): Boolean; virtual;
+    function LoadFromIniFile(AIni: TCustomIniFile): Boolean;
+    function SaveToIniFile(AIni: TCustomIniFile): Boolean;
     function LoadFromFile(AFileName: string): Boolean;
     function SaveToFile(AFileName: string): Boolean;
     procedure HookAttrChangeEvent(ANotifyEvent: TNotifyEvent);
@@ -873,16 +875,10 @@ end;
 function TSynCustomHighlighter.LoadFromFile(AFileName : String): boolean;
 var
   AIni: TMemIniFile;
-  i: Integer;
 begin
   AIni := TMemIniFile.Create(AFileName);
   try
-    with AIni do
-    begin
-      Result := True;
-      for i := 0 to AttrCount - 1 do
-        Result := Attribute[i].LoadFromFile(AIni) and Result;
-    end;
+    Result := LoadFromIniFile(AIni);
   finally
     AIni.Free;
   end;
@@ -891,18 +887,11 @@ end;
 function TSynCustomHighlighter.SaveToFile(AFileName : String): boolean;
 var
   AIni: TMemIniFile;
-  i: integer;
 begin
   AIni := TMemIniFile.Create(AFileName);
   try
-    with AIni do
-    begin
-      Result := True;
-      for i := 0 to AttrCount - 1 do
-        Result := Attribute[i].SaveToFile(AIni) and Result;
-    end;
+    Result := SaveToIniFile(AIni);
   finally
-    AIni.UpdateFile;
     AIni.Free;
   end;
 end;
@@ -1121,6 +1110,31 @@ begin
        Result := False;
       end;
     end;
+  end;
+end;
+
+function TSynCustomHighlighter.SaveToIniFile(AIni: TCustomIniFile): Boolean;
+var
+  i: Integer;
+begin
+  with AIni do
+  begin
+    Result := True;
+    for i := 0 to AttrCount - 1 do
+      Result := Attribute[i].SaveToFile(AIni) and Result;
+  end;
+  AIni.UpdateFile;
+end;
+
+function TSynCustomHighlighter.LoadFromIniFile(AIni: TCustomIniFile): Boolean;
+var
+  i: Integer;
+begin
+  with AIni do
+  begin
+    Result := True;
+    for i := 0 to AttrCount - 1 do
+      Result := Attribute[i].LoadFromFile(AIni) and Result;
   end;
 end;
 
