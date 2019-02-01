@@ -127,14 +127,23 @@ type
     function GetCanvas: TCanvas;
     function GetClientRect: TRect;
     function GetUndoList: TSynEditUndoList;
+    function GetBlockBegin: TBufferCoord;
+    function GetBlockEnd: TBufferCoord;
+    function GetDisplayXY: TDisplayCoord;
+    procedure SetBlockBegin(Value: TBufferCoord);
+    procedure SetBlockEnd(Value: TBufferCoord);
     property Canvas: TCanvas read GetCanvas;
     property ClientRect: TRect read GetClientRect;
     property UndoList: TSynEditUndoList read GetUndoList;
+    property BlockBegin: TBufferCoord read GetBlockBegin write SetBlockBegin;
+    property BlockEnd: TBufferCoord read GetBlockEnd write SetBlockEnd;
     procedure ComputeCaret(X, Y: Integer);
     procedure RegisterCommandHandler(const AHandlerProc: THookedCommandEvent;
       AHandlerData: pointer);
     procedure ExecuteCommand(Command: TSynEditorCommand; AChar: WideChar;
       Data: pointer);
+    function BufferToDisplayPos(const p: TBufferCoord): TDisplayCoord;
+    function DisplayToBufferPos(const p: TDisplayCoord): TBufferCoord;
     procedure BeginUpdate;
     procedure EndUpdate;
   end;
@@ -691,20 +700,28 @@ procedure TMultiCaretController.SandBox(Command: TSynEditorCommand;
   AChar: WideChar; Data: Pointer);
 var
   DefCaret, ActiveCaret: TCaretItem;
+  BlockBegin, BlockEnd: TBufferCoord;
 begin
+  // Store context
   DefCaret := FCarets.FDefaultCaret;
+  BlockBegin := FEditor.BlockBegin;
+  BlockEnd := FEditor.BlockEnd;
+  //
   FEditor.BeginUpdate;
-  //FCarets.Sort;
   FEditor.UndoList.AddMultiCaretChange(FCarets.Store);
   try
     for ActiveCaret in FCarets do begin
       FCarets.FDefaultCaret := ActiveCaret;
       FEditor.ComputeCaret(ActiveCaret.PosX, ActiveCaret.PosY);
+      FEditor.BlockBegin := FEditor.DisplayToBufferPos(FEditor.GetDisplayXY);
       FEditor.ExecuteCommand(Command, AChar, Data);
     end;
   finally
     FEditor.EndUpdate;
+    // Restore context
     FCarets.FDefaultCaret := DefCaret;
+    FEditor.BlockBegin := BlockBegin;
+    FEditor.BlockEnd := BlockEnd;
   end;
 end;
 
