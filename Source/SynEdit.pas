@@ -6263,14 +6263,14 @@ begin
         else begin
           if Item.ChangeReason = crMultiCaret then
             FKeepGoing := True
+          else if Item.ChangeNumber = OldChangeNumber then
+             FKeepGoing := True
           else if FAutoComplete then
              FKeepGoing := (FUndoList.LastChangeReason <> crAutoCompleteBegin)
           else if FPasteAction then
              FKeepGoing := (FUndoList.LastChangeReason <> crPasteBegin)
           else if FSpecial then
              FKeepGoing := (FUndoList.LastChangeReason <> crSpecialBegin)
-          else if Item.ChangeNumber = OldChangeNumber then
-             FKeepGoing := True
           else begin
             FKeepGoing := ((eoGroupUndo in FOptions) and
               (FLastChange = Item.ChangeReason) and

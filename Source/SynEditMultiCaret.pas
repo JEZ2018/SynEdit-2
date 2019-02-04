@@ -709,6 +709,7 @@ begin
   BlockEnd := FEditor.BlockEnd;
   //
   FEditor.BeginUpdate;
+  FEditor.UndoList.BeginBlock;
   FEditor.UndoList.AddMultiCaretChange(FCarets.Store);
   try
     for ActiveCaret in FCarets do begin
@@ -718,6 +719,7 @@ begin
       FEditor.ExecuteCommand(Command, AChar, Data);
     end;
   finally
+    FEditor.UndoList.EndBlock;
     FEditor.EndUpdate;
     // Restore context
     FCarets.FDefaultCaret := DefCaret;
