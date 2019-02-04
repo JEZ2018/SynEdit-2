@@ -811,17 +811,21 @@ procedure TMultiCaretController.EditorCommandSandBoxEntryPoint(Sender: TObject;
   var Command: TSynEditorCommand; var AChar: WideChar; Data,
   HandlerData: pointer);
 begin
-  Handled := (not AfterProcessing) and (FCommandsList.IndexOf(Command) <> -1);
-  if Handled then begin
-    if not FSandBoxContext then begin
-      FSandBoxContext := True;
-      try
-        SandBox(Command, AChar, Data);
-      finally
-        FSandBoxContext := False;
+  if FCarets.Count > 1 then begin
+    Handled := (not AfterProcessing) and (FCommandsList.IndexOf(Command) <> -1);
+    if Handled then begin
+      if not FSandBoxContext then begin
+        FSandBoxContext := True;
+        try
+          SandBox(Command, AChar, Data);
+        finally
+          FSandBoxContext := False;
+        end;
       end;
-    end;
+    end
   end
+  else
+    Handled := False
 end;
 
 procedure TMultiCaretController.Flash;
