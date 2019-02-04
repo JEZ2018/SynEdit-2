@@ -42,7 +42,8 @@ uses
 
 const
   // Editor commands that will be intercepted and executed in SandBox
-  SANDBOX_COMMANDS: array[0..1] of Integer = (ecChar, ecPaste);
+  SANDBOX_COMMANDS: array[0..3] of Integer = (ecChar, ecPaste,
+    ecCopyLineUp, ecCopyLineDown);
 
 type
 
