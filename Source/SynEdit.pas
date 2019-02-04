@@ -6320,6 +6320,7 @@ begin
         end;
       crMultiCaret:
         begin
+          fMultiCaretController.Carets.Clear(False);
           fMultiCaretController.Carets.Load(Item.MultiCaretDump);
           fMultiCaretController.Flash;
         end;
