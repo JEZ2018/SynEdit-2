@@ -112,6 +112,7 @@ type
     property OnBeforeCaretDelete: TNotifyEvent read FOnBeforeCaretDelete
       write FOnBeforeCaretDelete;
     function GetLineNeighboursOnRight(Caret: TCaretItem): TList<TCaretItem>;
+    function GetColumnNeighboursOnBottom(Caret: TCaretItem): TList<TCaretItem>;
   public
     constructor Create; virtual;
     destructor Destroy; override;
@@ -317,6 +318,21 @@ begin
   FColumn.Free;
   FSortedList.Free;
   inherited;
+end;
+
+function TCarets.GetColumnNeighboursOnBottom(
+  Caret: TCaretItem): TList<TCaretItem>;
+var
+  Iter: TCaretItem;
+begin
+  FColumn.Clear;
+  for Iter in FList do begin
+    if (Iter <> Caret) and (Iter.PosY > Caret.PosY) then begin
+      FColumn.Add(Iter)
+    end;
+  end;
+  FColumn.Sort(TComparer<TCaretItem>.Construct(CompareCarets));
+  Result := FColumn;
 end;
 
 function TCarets.GetDefaultCaretSafe: TCaretItem;
@@ -742,7 +758,7 @@ var
   DeltaX, DeltaY: Integer;
   BeforeXY, AfterXY, DeltaXY: TPoint;
   BlockBegin, BlockEnd: TBufferCoord;
-  RightLineSide: TList<TCaretItem>;
+  RightLineSide, BottomColumnSide: TList<TCaretItem>;
   Neighbour: TCaretItem;
 begin
   // Store context
@@ -755,19 +771,27 @@ begin
   FEditor.UndoList.AddMultiCaretChange(FCarets.Store);
   try
     for ActiveCaret in FCarets do begin
+      // implicitly set default caret
       FCarets.FDefaultCaret := ActiveCaret;
       FEditor.ComputeCaret(ActiveCaret.PosX, ActiveCaret.PosY);
-      RightLineSide := FCarets.GetLineNeighboursOnRight(ActiveCaret);
       BeforeXY := FEditor.DisplayCoord2CaretXY(FEditor.GetDisplayXY);
+      // neighbours
+      RightLineSide := FCarets.GetLineNeighboursOnRight(ActiveCaret);
+      BottomColumnSide := FCarets.GetColumnNeighboursOnBottom(ActiveCaret);
+      // store Editor context
       FEditor.BlockBegin := FEditor.DisplayToBufferPos(FEditor.GetDisplayXY);
       FEditor.ExecuteCommand(Command, AChar, Data);
+      // deltas
       AfterXY := FEditor.DisplayCoord2CaretXY(FEditor.BufferToDisplayPos(FEditor.GetCaretXY));
-      if RightLineSide.Count > 0 then begin
-        DeltaXY := AfterXY.Subtract(BeforeXY);
-        if DeltaXY.X > 0 then begin
-          for Neighbour in RightLineSide do
-            Neighbour.PosX := Neighbour.PosX + DeltaXY.X
-        end;
+      DeltaXY := AfterXY.Subtract(BeforeXY);
+      // correct neighbours coords according to deltas
+      if (RightLineSide.Count > 0) and (DeltaXY.X > 0) then begin
+        for Neighbour in RightLineSide do
+          Neighbour.PosX := Neighbour.PosX + DeltaXY.X
+      end;
+      if (BottomColumnSide.Count > 0) and (DeltaXY.Y > 0) then begin
+        for Neighbour in BottomColumnSide do
+          Neighbour.PosY := Neighbour.PosY + DeltaXY.Y
       end;
     end;
   finally
