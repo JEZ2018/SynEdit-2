@@ -2142,7 +2142,8 @@ begin
   if (Button = mbLeft) then begin
     if ssAlt in Shift then begin
       CaretPix := DisplayCoord2CaretXY(CaretDisplay);
-      fMultiCaretController.Carets.Add(CaretPix.X, CaretPix.Y, 0);
+      if not fMultiCaretController.Exists(CaretPix.X, CaretPix.Y) then
+        fMultiCaretController.Carets.Add(CaretPix.X, CaretPix.Y, 0);
     end
     else
       fMultiCaretController.Carets.Clear;

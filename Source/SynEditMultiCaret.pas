@@ -95,6 +95,7 @@ type
     FOnAfterClear: TNotifyEvent;
     FOnBeforeCaretDelete: TNotifyEvent;
     function GetItem(Index: Integer): TCaretItem;
+    function CompareCarets(const Left, Right: TCaretItem): Integer;
   private
     FDefaultCaret: TCaretItem;
     function GetDefaultCaretSafe: TCaretItem;
@@ -107,6 +108,7 @@ type
     property OnAfterClear: TNotifyEvent read FOnAfterClear write FOnAfterClear;
     property OnBeforeCaretDelete: TNotifyEvent read FOnBeforeCaretDelete
       write FOnBeforeCaretDelete;
+    function GetLineNeighboursOnRight(Caret: TCaretItem): TList<TCaretItem>;
   public
     constructor Create; virtual;
     destructor Destroy; override;
@@ -204,6 +206,7 @@ type
     property Active: Boolean read FActive write SetActive;
     property Carets: TCarets read FCarets;
     property Shape: TCaretShape read FShape write SetShape;
+    function Exists(const PosX: Integer; const PosY: Integer): Boolean;
     {$IFDEF DEBUG}
     procedure ShowDebugState;
     procedure InvertShown;
@@ -260,6 +263,13 @@ begin
   end;
   if Assigned(FOnChanged) then
     FOnChanged(Self)
+end;
+
+function TCarets.CompareCarets(const Left, Right: TCaretItem): Integer;
+begin
+  Result := Left.PosX - Right.PosX;
+  if Result = 0 then
+    Result := Left.PosY - Right.PosY
 end;
 
 function TCarets.Count: Integer;
@@ -324,6 +334,16 @@ begin
     Result:= FList[Index]
   else
     Result:= nil;
+end;
+
+function TCarets.GetLineNeighboursOnRight(Caret: TCaretItem): TList<TCaretItem>;
+var
+  Iter: TCaretItem;
+begin
+  FLine.Clear;
+  for Iter in FList do begin
+
+  end;
 end;
 
 function TCarets.IndexOf(APosX, APosY: Integer): Integer;
@@ -432,19 +452,10 @@ end;
 
 procedure TCarets.Sort;
 var
-  Comparison: TComparison<TCaretItem>;
   I: Integer;
 
 begin
-
-  Comparison :=
-  function(const Left, Right: TCaretItem): Integer
-  begin
-    Result := Left.PosX - Right.PosX;
-    if Result = 0 then
-      Result := Left.PosY - Right.PosY
-  end;
-  FList.Sort(TComparer<TCaretItem>.Construct(Comparison));
+  FList.Sort(TComparer<TCaretItem>.Construct(CompareCarets));
   for I := 0 to FList.Count-1 do
       FList[I].Index := I;
 end;
@@ -839,6 +850,21 @@ begin
   end
   else
     Handled := False
+end;
+
+function TMultiCaretController.Exists(const PosX, PosY: Integer): Boolean;
+var
+  Iter: TCaretItem;
+  IterRect, TmpRect, ShotRect: TRect;
+
+begin
+  Result := False;
+  for Iter in FCarets do begin
+    IterRect := CaretPointToRect(Iter.ToPoint);
+    ShotRect := CaretPointToRect(TPoint.Create(PosX, PosY));
+    if IntersectRect(TmpRect, ShotRect, IterRect) then
+      Exit(True)
+  end;
 end;
 
 procedure TMultiCaretController.Flash;
