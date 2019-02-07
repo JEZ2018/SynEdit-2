@@ -89,6 +89,7 @@ type
   TCarets = class
   strict private
     FList: TList<TCaretItem>;
+    FLine: TList<TCaretItem>;
     FOnChanged: TNotifyEvent;
     FOnBeforeClear: TNotifyEvent;
     FOnAfterClear: TNotifyEvent;
@@ -130,7 +131,9 @@ type
     function GetUndoList: TSynEditUndoList;
     function GetBlockBegin: TBufferCoord;
     function GetBlockEnd: TBufferCoord;
+    function GetCaretXY: TBufferCoord;
     function GetDisplayXY: TDisplayCoord;
+    function DisplayCoord2CaretXY(const Coord: TDisplayCoord): TPoint;
     procedure SetBlockBegin(Value: TBufferCoord);
     procedure SetBlockEnd(Value: TBufferCoord);
     property Canvas: TCanvas read GetCanvas;
@@ -268,6 +271,7 @@ constructor TCarets.Create;
 begin
   inherited;
   FList:= TList<TCaretItem>.Create;
+  FLine:= TList<TCaretItem>.Create;
 end;
 
 procedure TCarets.Delete(Index: Integer);
@@ -292,6 +296,8 @@ end;
 destructor TCarets.Destroy;
 begin
   Clear;
+  FList.Free;
+  FLine.Free;
   inherited;
 end;
 
@@ -383,7 +389,7 @@ begin
     try
       for I := 1 to Count do begin
         Caret := TCaretItem.Create;
-        Caret.Index := I;
+        Caret.Index := I-1;
         if not Caret.LoadFromStream(S) then
           Abort;
         NewList.Add(Caret);
@@ -427,8 +433,10 @@ end;
 procedure TCarets.Sort;
 var
   Comparison: TComparison<TCaretItem>;
+  I: Integer;
 
 begin
+
   Comparison :=
   function(const Left, Right: TCaretItem): Integer
   begin
@@ -436,8 +444,9 @@ begin
     if Result = 0 then
       Result := Left.PosY - Right.PosY
   end;
-
   FList.Sort(TComparer<TCaretItem>.Construct(Comparison));
+  for I := 0 to FList.Count-1 do
+      FList[I].Index := I;
 end;
 
 function TCarets.Store: TBytes;
@@ -701,6 +710,8 @@ procedure TMultiCaretController.SandBox(Command: TSynEditorCommand;
   AChar: WideChar; Data: Pointer);
 var
   DefCaret, ActiveCaret: TCaretItem;
+  DeltaX, DeltaY: Integer;
+  BeforePos, AfterPos, Deltas: TPoint;
   BlockBegin, BlockEnd: TBufferCoord;
 begin
   // Store context
@@ -709,17 +720,19 @@ begin
   BlockEnd := FEditor.BlockEnd;
   //
   FEditor.BeginUpdate;
-  FEditor.UndoList.BeginBlock;
+  FEditor.UndoList.BeginMultiBlock;
   FEditor.UndoList.AddMultiCaretChange(FCarets.Store);
   try
     for ActiveCaret in FCarets do begin
       FCarets.FDefaultCaret := ActiveCaret;
       FEditor.ComputeCaret(ActiveCaret.PosX, ActiveCaret.PosY);
+      BeforePos := FEditor.DisplayCoord2CaretXY(FEditor.GetDisplayXY);
       FEditor.BlockBegin := FEditor.DisplayToBufferPos(FEditor.GetDisplayXY);
       FEditor.ExecuteCommand(Command, AChar, Data);
+      AfterPos := FEditor.DisplayCoord2CaretXY(FEditor.BufferToDisplayPos(FEditor.GetCaretXY));
     end;
   finally
-    FEditor.UndoList.EndBlock;
+    FEditor.UndoList.EndMultiBlock;
     FEditor.EndUpdate;
     // Restore context
     FCarets.FDefaultCaret := DefCaret;

@@ -189,6 +189,7 @@ type
     fChangeEndPos: TBufferCoord;
     fChangeStr: string;
     fChangeNumber: integer;
+    fMultiBlockNumber: integer;
     fMultiCaretDump: TBytes;
   public
     procedure Assign(Source: TPersistent); override;
@@ -198,13 +199,16 @@ type
     property ChangeEndPos: TBufferCoord read fChangeEndPos;
     property ChangeStr: string read fChangeStr;
     property ChangeNumber: integer read fChangeNumber;
+    property MultiBlockNumber: integer read fMultiBlockNumber;
     property MultiCaretDump: TBytes read fMultiCaretDump;
   end;
 
   TSynEditUndoList = class(TPersistent)
   protected
     fBlockChangeNumber: integer;
+    fMultiBlockChangeNumber: integer;
     fBlockCount: integer;
+    fMultiBlockCount: integer;
     fFullUndoImposible: boolean;
     fItems: TList;
     fLockCount: integer;
@@ -227,9 +231,11 @@ type
     procedure AddChange(AReason: TSynChangeReason; const AStart, AEnd: TBufferCoord;
       const ChangeText: string; SelMode: TSynSelectionMode); overload;
     procedure AddMultiCaretChange(const AMultiCaretDump: TBytes);
-    procedure BeginBlock;                                                       
+    procedure BeginBlock;
+    procedure BeginMultiBlock;
     procedure Clear;
     procedure EndBlock;
+    procedure EndMultiBlock;
     procedure Lock;
     function PeekItem: TSynEditUndoItem;
     function PopItem: TSynEditUndoItem;
@@ -949,6 +955,7 @@ begin
     fChangeEndPos:=TSynEditUndoItem(Source).fChangeEndPos;
     fChangeStr:=TSynEditUndoItem(Source).fChangeStr;
     fChangeNumber:=TSynEditUndoItem(Source).fChangeNumber;
+    fMultiBlockNumber:=TSynEditUndoItem(Source).fMultiBlockNumber;
     fMultiCaretDump:=TSynEditUndoItem(Source).fMultiCaretDump;
   end
   else
@@ -1014,6 +1021,7 @@ begin
         fChangeStartPos := AStart;
         fChangeEndPos := AEnd;
         fChangeStr := ChangeText;
+        fMultiBlockNumber := Self.fMultiBlockChangeNumber;
         if fBlockChangeNumber <> 0 then
           fChangeNumber := fBlockChangeNumber
         else begin
@@ -1037,6 +1045,12 @@ procedure TSynEditUndoList.BeginBlock;
 begin
   Inc(fBlockCount);
   fBlockChangeNumber := fNextChangeNumber;
+end;
+
+procedure TSynEditUndoList.BeginMultiBlock;
+begin
+  Inc(fMultiBlockCount);
+  fMultiBlockChangeNumber := fMultiBlockCount;
 end;
 
 procedure TSynEditUndoList.Clear;
@@ -1068,6 +1082,11 @@ begin
       end;
     end;
   end;
+end;
+
+procedure TSynEditUndoList.EndMultiBlock;
+begin
+  fMultiBlockChangeNumber := 0;
 end;
 
 procedure TSynEditUndoList.EnsureMaxEntries;

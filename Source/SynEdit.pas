@@ -6230,12 +6230,15 @@ procedure TCustomSynEdit.Undo;
 var
   Item: TSynEditUndoItem;
   OldChangeNumber: integer;
+  IsMultiBlock: Boolean;
+  OldMultiBlockNumber: Integer;
   SaveChangeNumber: integer;
   FLastChange : TSynChangeReason;
   FAutoComplete: Boolean;
   FPasteAction: Boolean;
   FSpecial: Boolean;
   FKeepGoing: Boolean;
+
 begin
   if ReadOnly then
     exit;
@@ -6253,6 +6256,8 @@ begin
     OldChangeNumber := Item.ChangeNumber;
     SaveChangeNumber := fRedoList.BlockChangeNumber;
     fRedoList.BlockChangeNumber := Item.ChangeNumber;
+    IsMultiBlock := Item.MultiBlockNumber <> 0;
+    OldMultiBlockNumber := Item.MultiBlockNumber;
 
     try
       repeat
@@ -6261,16 +6266,20 @@ begin
         if Item = nil then
           FKeepGoing := False
         else begin
-          if Item.ChangeReason = crMultiCaret then
-            FKeepGoing := True
-          else if Item.ChangeNumber = OldChangeNumber then
-             FKeepGoing := True
+          if IsMultiBlock and (Item.MultiBlockNumber <> 0) and (Item.MultiBlockNumber <> OldMultiBlockNumber) then begin
+            if (Item.ChangeReason = FLastChange) and (Item.ChangeReason <> crPasteEnd) then
+              OldMultiBlockNumber := Item.MultiBlockNumber;
+          end;
+          if IsMultiBlock then
+            FKeepGoing := (Item.MultiBlockNumber <> 0) and (Item.MultiBlockNumber = OldMultiBlockNumber)
           else if FAutoComplete then
              FKeepGoing := (FUndoList.LastChangeReason <> crAutoCompleteBegin)
           else if FPasteAction then
              FKeepGoing := (FUndoList.LastChangeReason <> crPasteBegin)
           else if FSpecial then
              FKeepGoing := (FUndoList.LastChangeReason <> crSpecialBegin)
+          else if Item.ChangeNumber = OldChangeNumber then
+             FKeepGoing := True
           else begin
             FKeepGoing := ((eoGroupUndo in FOptions) and
               (FLastChange = Item.ChangeReason) and
