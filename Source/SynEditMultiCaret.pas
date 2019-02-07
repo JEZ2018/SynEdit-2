@@ -42,8 +42,7 @@ uses
 
 const
   // Editor commands that will be intercepted and executed in SandBox
-  SANDBOX_COMMANDS: array[0..3] of Integer = (ecChar, ecPaste,
-    ecCopyLineUp, ecCopyLineDown);
+  SANDBOX_COMMANDS: array[0..2] of Integer = (ecChar, ecPaste, ecLineBreak);
 
 type
 
@@ -342,8 +341,12 @@ var
 begin
   FLine.Clear;
   for Iter in FList do begin
-
+    if (Iter <> Caret) and (Iter.PosY = Caret.PosY) and (Iter.PosX > Caret.PosX) then begin
+      FLine.Add(Iter)
+    end;
   end;
+  FLine.Sort(TComparer<TCaretItem>.Construct(CompareCarets));
+  Result := FLine;
 end;
 
 function TCarets.IndexOf(APosX, APosY: Integer): Integer;
@@ -722,8 +725,10 @@ procedure TMultiCaretController.SandBox(Command: TSynEditorCommand;
 var
   DefCaret, ActiveCaret: TCaretItem;
   DeltaX, DeltaY: Integer;
-  BeforePos, AfterPos, Deltas: TPoint;
+  BeforeXY, AfterXY, DeltaXY: TPoint;
   BlockBegin, BlockEnd: TBufferCoord;
+  Neighbours: TList<TCaretItem>;
+  Neighbour: TCaretItem;
 begin
   // Store context
   DefCaret := FCarets.FDefaultCaret;
@@ -737,10 +742,18 @@ begin
     for ActiveCaret in FCarets do begin
       FCarets.FDefaultCaret := ActiveCaret;
       FEditor.ComputeCaret(ActiveCaret.PosX, ActiveCaret.PosY);
-      BeforePos := FEditor.DisplayCoord2CaretXY(FEditor.GetDisplayXY);
+      BeforeXY := FEditor.DisplayCoord2CaretXY(FEditor.GetDisplayXY);
       FEditor.BlockBegin := FEditor.DisplayToBufferPos(FEditor.GetDisplayXY);
       FEditor.ExecuteCommand(Command, AChar, Data);
-      AfterPos := FEditor.DisplayCoord2CaretXY(FEditor.BufferToDisplayPos(FEditor.GetCaretXY));
+      AfterXY := FEditor.DisplayCoord2CaretXY(FEditor.BufferToDisplayPos(FEditor.GetCaretXY));
+      Neighbours := FCarets.GetLineNeighboursOnRight(ActiveCaret);
+      if Neighbours.Count > 0 then begin
+        DeltaXY := AfterXY.Subtract(BeforeXY);
+        if DeltaXY.X > 0 then begin
+          for Neighbour in Neighbours do
+            Neighbour.PosX := Neighbour.PosX + DeltaXY.X
+        end;
+      end;
     end;
   finally
     FEditor.UndoList.EndMultiBlock;
