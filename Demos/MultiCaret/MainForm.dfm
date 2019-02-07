@@ -49,6 +49,12 @@ object TMainForm: TTMainForm
       
         'Use the menu to open one of the demo files in the project direct' +
         'ory.'
+      ''
+      'line1'
+      'line2'
+      'line3'
+      'line4'
+      ''
       '- demo.cpp'
       '- demo.js'
       '- demo.py'

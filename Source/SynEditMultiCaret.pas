@@ -90,6 +90,7 @@ type
   strict private
     FList: TList<TCaretItem>;
     FLine: TList<TCaretItem>;
+    FColumn: TList<TCaretItem>;
     FSortedList: TList<TCaretItem>;
     FOnChanged: TNotifyEvent;
     FOnBeforeClear: TNotifyEvent;
@@ -137,6 +138,7 @@ type
     function GetCaretXY: TBufferCoord;
     function GetDisplayXY: TDisplayCoord;
     function DisplayCoord2CaretXY(const Coord: TDisplayCoord): TPoint;
+    function PixelsToNearestRowColumn(aX, aY: Integer): TDisplayCoord;
     procedure SetBlockBegin(Value: TBufferCoord);
     procedure SetBlockEnd(Value: TBufferCoord);
     property Canvas: TCanvas read GetCanvas;
@@ -283,6 +285,7 @@ begin
   inherited;
   FList:= TList<TCaretItem>.Create;
   FLine:= TList<TCaretItem>.Create;
+  FColumn := TList<TCaretItem>.Create;
   FSortedList := TList<TCaretItem>.Create;
 end;
 
@@ -310,6 +313,7 @@ begin
   Clear;
   FList.Free;
   FLine.Free;
+  FColumn.Free;
   FSortedList.Free;
   inherited;
 end;
@@ -617,6 +621,7 @@ procedure TMultiCaretController.DefaultCaretMoved(const PointFrom,
 var
   Caret: TCaretItem;
   Delta: TPoint;
+  NewPos: TPoint;
 begin
   if FSandBoxContext then begin
     Delta.X := PointTo.X - PointFrom.X;
@@ -624,8 +629,12 @@ begin
     for Caret in FCarets do begin
       if Caret = Carets.FDefaultCaret then
         Continue;
-      Caret.PosX := Caret.PosX + Delta.X;
-      Caret.PosY := Caret.PosY + Delta.Y;
+      // prepare
+      NewPos := TPoint.Create(Caret.PosX + Delta.X, Caret.PosY + Delta.Y);
+      NewPos := FEditor.DisplayCoord2CaretXY(FEditor.PixelsToNearestRowColumn(NewPos.X, NewPos.Y));
+      // apply new values
+      Caret.PosX := NewPos.X;
+      Caret.PosY := NewPos.Y;
     end;
   end;
 end;
