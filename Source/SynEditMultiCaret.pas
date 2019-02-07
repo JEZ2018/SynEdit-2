@@ -42,7 +42,8 @@ uses
 
 const
   // Editor commands that will be intercepted and executed in SandBox
-  SANDBOX_COMMANDS: array[0..2] of Integer = (ecChar, ecPaste, ecLineBreak);
+  SANDBOX_COMMANDS: array[0..6] of Integer = (ecChar, ecPaste, ecLineBreak,
+    ecMoveLineDown, ecMoveLineUp, ecCopyLineDown, ecCopyLineUp);
 
 type
 
@@ -89,6 +90,7 @@ type
   strict private
     FList: TList<TCaretItem>;
     FLine: TList<TCaretItem>;
+    FSortedList: TList<TCaretItem>;
     FOnChanged: TNotifyEvent;
     FOnBeforeClear: TNotifyEvent;
     FOnAfterClear: TNotifyEvent;
@@ -114,9 +116,9 @@ type
     function Add(APosX, APosY, ASelLen: Integer): TCaretItem;
     procedure Clear(ExcludeDefaultCaret: Boolean = True);
     procedure Delete(Index: Integer);
-    procedure Sort;
     function Count: Integer;
     function InRange(N: Integer): Boolean;
+    function Sorted:  TList<TCaretItem>;
     property Items[N: Integer]: TCaretItem read GetItem; default;
     property DefaultCaret: TCaretItem read GetDefaultCaretSafe;
     function IndexOf(APosX, APosY: Integer): Integer;
@@ -281,6 +283,7 @@ begin
   inherited;
   FList:= TList<TCaretItem>.Create;
   FLine:= TList<TCaretItem>.Create;
+  FSortedList := TList<TCaretItem>.Create;
 end;
 
 procedure TCarets.Delete(Index: Integer);
@@ -307,6 +310,7 @@ begin
   Clear;
   FList.Free;
   FLine.Free;
+  FSortedList.Free;
   inherited;
 end;
 
@@ -453,14 +457,15 @@ begin
     Caret.SaveToStream(S);
 end;
 
-procedure TCarets.Sort;
+function TCarets.Sorted: TList<TCaretItem>;
 var
-  I: Integer;
-
+  Iter: TCaretItem;
 begin
-  FList.Sort(TComparer<TCaretItem>.Construct(CompareCarets));
-  for I := 0 to FList.Count-1 do
-      FList[I].Index := I;
+  FSortedList.Clear;
+  for Iter in FList do
+    FSortedList.Add(Iter);
+  FSortedList.Sort(TComparer<TCaretItem>.Construct(CompareCarets));
+  Result := FSortedList;
 end;
 
 function TCarets.Store: TBytes;
@@ -727,7 +732,7 @@ var
   DeltaX, DeltaY: Integer;
   BeforeXY, AfterXY, DeltaXY: TPoint;
   BlockBegin, BlockEnd: TBufferCoord;
-  Neighbours: TList<TCaretItem>;
+  RightLineSide: TList<TCaretItem>;
   Neighbour: TCaretItem;
 begin
   // Store context
@@ -742,15 +747,15 @@ begin
     for ActiveCaret in FCarets do begin
       FCarets.FDefaultCaret := ActiveCaret;
       FEditor.ComputeCaret(ActiveCaret.PosX, ActiveCaret.PosY);
+      RightLineSide := FCarets.GetLineNeighboursOnRight(ActiveCaret);
       BeforeXY := FEditor.DisplayCoord2CaretXY(FEditor.GetDisplayXY);
       FEditor.BlockBegin := FEditor.DisplayToBufferPos(FEditor.GetDisplayXY);
       FEditor.ExecuteCommand(Command, AChar, Data);
       AfterXY := FEditor.DisplayCoord2CaretXY(FEditor.BufferToDisplayPos(FEditor.GetCaretXY));
-      Neighbours := FCarets.GetLineNeighboursOnRight(ActiveCaret);
-      if Neighbours.Count > 0 then begin
+      if RightLineSide.Count > 0 then begin
         DeltaXY := AfterXY.Subtract(BeforeXY);
         if DeltaXY.X > 0 then begin
-          for Neighbour in Neighbours do
+          for Neighbour in RightLineSide do
             Neighbour.PosX := Neighbour.PosX + DeltaXY.X
         end;
       end;
