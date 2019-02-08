@@ -42,9 +42,9 @@ uses
 
 const
   // Editor commands that will be intercepted and executed in SandBox
-  SANDBOX_COMMANDS: array[0..8] of Integer = (ecChar, ecPaste, ecLineBreak,
+  SANDBOX_COMMANDS: array[0..10] of Integer = (ecChar, ecPaste, ecLineBreak,
     ecMoveLineDown, ecMoveLineUp, ecCopyLineDown, ecCopyLineUp,
-    ecDeleteLastChar, ecDeleteChar);
+    ecDeleteLastChar, ecDeleteChar, ecSelLeft, ecSelRight);
 
 type
 
@@ -140,6 +140,7 @@ type
     function GetBlockEnd: TBufferCoord;
     function GetCaretXY: TBufferCoord;
     function GetDisplayXY: TDisplayCoord;
+    function GetTextHeight: Integer;
     function DisplayCoord2CaretXY(const Coord: TDisplayCoord): TPoint;
     function PixelsToNearestRowColumn(aX, aY: Integer): TDisplayCoord;
     procedure SetBlockBegin(Value: TBufferCoord);
@@ -149,12 +150,13 @@ type
     property UndoList: TSynEditUndoList read GetUndoList;
     property BlockBegin: TBufferCoord read GetBlockBegin write SetBlockBegin;
     property BlockEnd: TBufferCoord read GetBlockEnd write SetBlockEnd;
+    property TextHeight: Integer read GetTextHeight;
     procedure ComputeCaret(X, Y: Integer);
     procedure RegisterCommandHandler(const AHandlerProc: THookedCommandEvent;
       AHandlerData: pointer);
     procedure ExecuteCommand(Command: TSynEditorCommand; AChar: WideChar;
       Data: pointer);
-    procedure InvalidateLines(FirstLine, LastLine: integer);
+    procedure InvalidateRect(const aRect: TRect; aErase: Boolean);
     function BufferToDisplayPos(const p: TBufferCoord): TDisplayCoord;
     function DisplayToBufferPos(const p: TDisplayCoord): TBufferCoord;
     procedure BeginUpdate;
@@ -183,6 +185,7 @@ type
     FCommandsList: TList<Integer>;
     FSandBoxContext: Boolean;
     function CaretPointToRect(const CaretPoint: TPoint): TRect;
+    function CaretSelectionRect(Caret: TCaretItem): TRect;
     procedure SetActive(const Value: Boolean);
     procedure SetShape(const Value: TCaretShape);
     procedure InvertRects;
@@ -211,6 +214,7 @@ type
     procedure Flash;
     procedure MoveY(Delta: Integer);
     procedure MoveX(Delta: Integer);
+    procedure Unselect;
     property Active: Boolean read FActive write SetActive;
     property Carets: TCarets read FCarets;
     property Shape: TCaretShape read FShape write SetShape;
@@ -619,6 +623,12 @@ begin
   Result := Rect(P.X, P.Y, P.X + CaretWidth, P.Y + CaretHeight);
 end;
 
+function TMultiCaretController.CaretSelectionRect(Caret: TCaretItem): TRect;
+begin
+  Result := TRect.Create(Caret.ToPoint, -Caret.SelLen, FEditor.TextHeight);
+  Result.NormalizeRect;
+end;
+
 constructor TMultiCaretController.Create(Editor: IAbstractEditor);
 var
   I: Integer;
@@ -761,9 +771,24 @@ begin
 end;
 
 procedure TMultiCaretController.Paint;
+var
+  Caret: TCaretItem;
+  Rect: TRect;
 begin
   if FShown then
-    InvertRects
+    InvertRects;
+  // repaint selection area
+  for Caret in FCarets do begin
+    if Caret.SelLen <> 0 then begin
+      Rect := CaretSelectionRect(Caret);
+      FEditor.Canvas.Brush.Color := clBlue;
+      FEditor.Canvas.Brush.Style := bsSolid;
+      InvertRect(FEditor.GetCanvas.Handle, Rect);
+     // FEditor.Canvas.FillRect(Rect);
+//
+//      FEditor.InvalidateRect(R, False);
+    end;
+  end;
 end;
 
 procedure TMultiCaretController.SandBox(Command: TSynEditorCommand;
@@ -782,8 +807,10 @@ begin
   BlockEnd := FEditor.BlockEnd;
   //
   FEditor.BeginUpdate;
-  FEditor.UndoList.BeginMultiBlock;
-  FEditor.UndoList.AddMultiCaretChange(FCarets.Store);
+  if not IsSelectionCommand(Command) then begin
+    FEditor.UndoList.BeginMultiBlock;
+    FEditor.UndoList.AddMultiCaretChange(FCarets.Store);
+  end;
   try
     for ActiveCaret in FCarets do begin
       // implicitly set default caret
@@ -810,13 +837,15 @@ begin
       end;
     end;
     if IsSelectionCommand(Command) then begin
-      NewSelLen := FEditor.BlockEnd.Char - BlockBegin.Char;
+      NewSelLen := ActiveCaret.SelLen + AfterXY.X - BeforeXY.X;
       for ActiveCaret in FCarets do begin
         ActiveCaret.SelLen := NewSelLen
       end;
     end;
   finally
-    FEditor.UndoList.EndMultiBlock;
+    if not IsSelectionCommand(Command) then begin
+      FEditor.UndoList.EndMultiBlock;
+    end;
     FEditor.EndUpdate;
     // Restore context
     FCarets.FDefaultCaret := DefCaret;
@@ -869,6 +898,15 @@ begin
     Comma.Free;
   end;
 end;
+procedure TMultiCaretController.Unselect;
+var
+  Caret: TCaretItem;
+begin
+  for Caret in FCarets do begin
+    Caret.SelLen := 0;
+  end;
+end;
+
 {$ENDIF}
 
 procedure TMultiCaretController.DoCaretsChanged(Sender: TObject);
@@ -888,7 +926,7 @@ end;
 procedure TMultiCaretController.DoCaretSelLenChanged(Sender: TCaretItem;
   const ValueFrom, ValueTo: Integer);
 begin
-  FEditor.InvalidateLines(1, 1);
+  // nothing
 end;
 
 procedure TMultiCaretController.DoCaretVisibleChanged(Sender: TCaretItem);

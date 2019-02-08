@@ -488,6 +488,7 @@ type
     function GetWordAtMouse: string;
     function GetWordWrap: Boolean;
     function GetUndoList: TSynEditUndoList;
+    function GetTextHeight: Integer;
     procedure GutterChanged(Sender: TObject);
     function LeftSpaces(const Line: string): Integer;
 //++ CodeFolding
@@ -854,7 +855,7 @@ type
     property Highlighter: TSynCustomHighlighter
       read fHighlighter write SetHighlighter;
     property LeftChar: Integer read fLeftChar write SetLeftChar;
-    property LineHeight: Integer read fTextHeight;
+    property LineHeight: Integer read GetTextHeight;
     property LinesInWindow: Integer read fLinesInWindow;
     property LineText: string read GetLineText write SetLineText;
     property Lines: TStrings read fLines write SetLines;
@@ -964,6 +965,7 @@ type
       read fOnScanForFoldRanges write fOnScanForFoldRanges;
 //-- CodeFolding
 //++ IAbstractEditor
+    property Carets: TMultiCaretController read fMultiCaretController;
     function GetCanvas: TCanvas;
 //-- IAbstractEditor
   published
@@ -1486,6 +1488,11 @@ end;
 function TCustomSynEdit.GetFont: TFont;
 begin
   Result := inherited Font;
+end;
+
+function TCustomSynEdit.GetTextHeight: Integer;
+begin
+  Result := fTextHeight;
 end;
 
 function TCustomSynEdit.GetLineText: string;
