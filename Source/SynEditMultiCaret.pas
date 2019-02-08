@@ -188,7 +188,7 @@ type
     function CaretSelectionRect(Caret: TCaretItem): TRect;
     procedure SetActive(const Value: Boolean);
     procedure SetShape(const Value: TCaretShape);
-    procedure InvertRects;
+    procedure InvertCaretsRects;
     procedure Blink(Sender: TObject);
     procedure DoCaretsChanged(Sender: TObject);
     procedure DoBeforeAfterCaretsClear(Sender: TObject);
@@ -606,7 +606,7 @@ end;
 procedure TMultiCaretController.Blink(Sender: TObject);
 begin
   FShown := not FShown;
-  InvertRects;
+  InvertCaretsRects;
 end;
 
 function TMultiCaretController.CaretPointToRect(const CaretPoint: TPoint): TRect;
@@ -683,7 +683,7 @@ begin
   inherited;
 end;
 
-procedure TMultiCaretController.InvertRects;
+procedure TMultiCaretController.InvertCaretsRects;
 var
   Caret: TCaretItem;
   P: TPoint;
@@ -735,7 +735,7 @@ end;
 procedure TMultiCaretController.DoBeforeAfterCaretsClear(Sender: TObject);
 begin
   if FShown then
-    InvertRects;
+    InvertCaretsRects;
 end;
 
 procedure TMultiCaretController.DoBeforeCaretsDelete(Sender: TObject);
@@ -776,7 +776,7 @@ var
   Rect: TRect;
 begin
   if FShown then
-    InvertRects;
+    InvertCaretsRects;
   // repaint selection area
   for Caret in FCarets do begin
     if Caret.SelLen <> 0 then begin
@@ -858,7 +858,7 @@ procedure TMultiCaretController.SetActive(const Value: Boolean);
 begin
   if FActive <> Value then begin
     if FShown then
-      InvertRects;
+      InvertCaretsRects;
     FActive := Value;
     FShown := False;
     FBlinkTimer.Enabled := Value;
@@ -869,10 +869,10 @@ procedure TMultiCaretController.SetShape(const Value: TCaretShape);
 begin
   if not (FShape = Value) then begin
     if FShown then
-      InvertRects;
+      InvertCaretsRects;
     FShape := Value;
     if FShown then
-      InvertRects;
+      InvertCaretsRects;
   end;
 end;
 
@@ -985,7 +985,7 @@ begin
   {$ENDIF}
   if not FShown then begin
     FShown := True;
-    InvertRects;
+    InvertCaretsRects;
     // restart blink timer
     FBlinkTimer.Enabled := False;
     FBlinkTimer.Enabled := True;
