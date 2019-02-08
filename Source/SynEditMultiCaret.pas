@@ -80,6 +80,7 @@ type
   public
     constructor Create; overload;
     constructor Create(PosX, PosY, SelLen: Integer); overload;
+    destructor Destroy; override;
     function ToPoint: TPoint;
     property PosX: Integer read FPosX write SetPosX;
     property PosY: INteger read FPosY write SetPosY;
@@ -153,6 +154,7 @@ type
       AHandlerData: pointer);
     procedure ExecuteCommand(Command: TSynEditorCommand; AChar: WideChar;
       Data: pointer);
+    procedure InvalidateLines(FirstLine, LastLine: integer);
     function BufferToDisplayPos(const p: TBufferCoord): TDisplayCoord;
     function DisplayToBufferPos(const p: TDisplayCoord): TBufferCoord;
     procedure BeginUpdate;
@@ -201,6 +203,7 @@ type
       Data: pointer; HandlerData: pointer);
     procedure SandBox(Command: TSynEditorCommand; AChar: WideChar;
       Data: Pointer);
+    function IsSelectionCommand(Command: TSynEditorCommand): Boolean;
   public
     constructor Create(Editor: IAbstractEditor);
     destructor Destroy; override;
@@ -521,6 +524,13 @@ begin
   FSelLen := SelLen;
 end;
 
+destructor TCaretItem.Destroy;
+begin
+  // Raise events to repaint Editor rect
+  Visible := False;
+  inherited;
+end;
+
 function TCaretItem.LoadFromStream(S: TStream): Boolean;
 begin
   Result := (S.Read(FPosX, SizeOf(FPosX)) = SizeOf(FPosX))
@@ -689,6 +699,11 @@ begin
   FShown := not FShown
 end;
 
+function TMultiCaretController.IsSelectionCommand(Command: TSynEditorCommand): Boolean;
+begin
+  Result := InRange(Command, ecSelLeft, ecSelGotoXY)
+end;
+
 procedure TMultiCaretController.MoveX(Delta: Integer);
 var
   Caret: TCaretItem;
@@ -755,7 +770,7 @@ procedure TMultiCaretController.SandBox(Command: TSynEditorCommand;
   AChar: WideChar; Data: Pointer);
 var
   DefCaret, ActiveCaret: TCaretItem;
-  DeltaX, DeltaY: Integer;
+  DeltaX, DeltaY, NewSelLen: Integer;
   BeforeXY, AfterXY, DeltaXY: TPoint;
   BlockBegin, BlockEnd: TBufferCoord;
   RightLineSide, BottomColumnSide: TList<TCaretItem>;
@@ -792,6 +807,12 @@ begin
       if (BottomColumnSide.Count > 0) and (DeltaXY.Y > 0) then begin
         for Neighbour in BottomColumnSide do
           Neighbour.PosY := Neighbour.PosY + DeltaXY.Y
+      end;
+    end;
+    if IsSelectionCommand(Command) then begin
+      NewSelLen := FEditor.BlockEnd.Char - BlockBegin.Char;
+      for ActiveCaret in FCarets do begin
+        ActiveCaret.SelLen := NewSelLen
       end;
     end;
   finally
@@ -867,7 +888,7 @@ end;
 procedure TMultiCaretController.DoCaretSelLenChanged(Sender: TCaretItem;
   const ValueFrom, ValueTo: Integer);
 begin
-  // TODO
+  FEditor.InvalidateLines(1, 1);
 end;
 
 procedure TMultiCaretController.DoCaretVisibleChanged(Sender: TCaretItem);
