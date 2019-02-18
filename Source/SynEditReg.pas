@@ -128,7 +128,7 @@ implementation
 procedure Register;
 begin
 // SynEdit main components
-  RegisterComponents(SYNS_ComponentsPage, [TSynEdit, TSynMemo]);
+  RegisterComponents(SYNS_ComponentsPage, [TSynEdit]);
 
   RegisterComponents(SYNS_ComponentsPage, [TDBSynEdit]);
 
