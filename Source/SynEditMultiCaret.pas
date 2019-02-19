@@ -144,6 +144,7 @@ type
     function PixelsToNearestRowColumn(aX, aY: Integer): TDisplayCoord;
     procedure SetBlockBegin(Value: TBufferCoord);
     procedure SetBlockEnd(Value: TBufferCoord);
+    procedure SetCaretAndSelection(const ptCaret, ptBefore, ptAfter: TBufferCoord);
     property Canvas: TCanvas read GetCanvas;
     property ClientRect: TRect read GetClientRect;
     property UndoList: TSynEditUndoList read GetUndoList;
@@ -859,42 +860,6 @@ begin
         end;
       end;
     end;
-    if IsSelectionCommand(Command) then begin
-      // Sort By line, column
-      SortedCarets := FCarets.Sorted;
-      Index := 0;
-      while Index < SortedCarets.Count-1 do begin
-        Cur := SortedCarets[Index];
-        Next := SortedCarets[Index+1];
-        if Cur.Selection.HasIntersection(Next.Selection) then begin
-          if Command in [ecSelUp, ecSelLeft] then begin
-            Cur.Selection := TSelection.Join(Cur.Selection, Next.Selection);
-            if Next = FCarets.DefaultCaret then
-              FCarets.FDefaultCaret := Cur;
-            FCarets.Delete(Next.Index);
-            SortedCarets.Delete(Index+1);
-          end
-          else if Command in [ecSelDown, ecSelRight] then begin
-            Next.Selection := TSelection.Join(Cur.Selection, Next.Selection);
-            if Cur = FCarets.DefaultCaret then
-              FCarets.FDefaultCaret := Next;
-            FCarets.Delete(Cur.Index);
-            SortedCarets.Delete(Index);
-          end
-          else
-            Inc(Index)
-        end
-        else
-          Inc(Index)
-      end;
-      {if HasSelection and (FCarets.Count = 1) then begin
-        FEditor.BlockBegin := FEditor.DisplayToBufferPos(FCarets.DefaultCaret.Selection.Start);
-        FEditor.BlockEnd := FEditor.DisplayToBufferPos(FCarets.DefaultCaret.Selection.Stop);
-        FEditor.SetSelectionMode(smNormal);
-        ClearSelection;
-        FEditor.Refresh;
-      end;}
-    end;
   finally
     if not IsSelectionCommand(Command) then begin
       FEditor.UndoList.EndMultiBlock;
@@ -905,6 +870,44 @@ begin
     FEditor.BlockBegin := BlockBegin;
     FEditor.BlockEnd := BlockEnd;
   end;
+  if IsSelectionCommand(Command) then begin
+    // Sort By line, column
+    SortedCarets := FCarets.Sorted;
+    Index := 0;
+    while Index < SortedCarets.Count-1 do begin
+      Cur := SortedCarets[Index];
+      Next := SortedCarets[Index+1];
+      if Cur.Selection.HasIntersection(Next.Selection) then begin
+        if Command in [ecSelUp, ecSelLeft] then begin
+          Cur.Selection.Join(Next.Selection);
+          if Next = FCarets.DefaultCaret then
+            FCarets.FDefaultCaret := Cur;
+          FCarets.Delete(Next.Index);
+          SortedCarets.Delete(Index+1);
+        end
+        else if Command in [ecSelDown, ecSelRight] then begin
+          Next.Selection.Join(Cur.Selection);
+          if Cur = FCarets.DefaultCaret then
+            FCarets.FDefaultCaret := Next;
+          FCarets.Delete(Cur.Index);
+          SortedCarets.Delete(Index);
+        end
+        else
+          Inc(Index)
+      end
+      else
+        Inc(Index)
+    end;
+  end;
+  if HasSelection and (FCarets.Count = 1) then begin
+    FCarets.FDefaultCaret := FCarets[0];
+    FEditor.SetSelectionMode(smNormal);
+    FEditor.SetCaretAndSelection(
+      FEditor.DisplayToBufferPos(FCarets.DefaultCaret.Selection.Stop),
+      FEditor.DisplayToBufferPos(FCarets.DefaultCaret.Selection.Start),
+      FEditor.DisplayToBufferPos(FCarets.DefaultCaret.Selection.Stop)
+    );
+  end
 end;
 
 procedure TMultiCaretController.SetActive(const Value: Boolean);

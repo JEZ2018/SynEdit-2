@@ -112,10 +112,10 @@ type
     Stop: TDisplayCoord;
     function Normalize: TSelection;
     function IsEmpty: Boolean;
+    procedure Join(const Sel: TSelection);
     function HasIntersection(const Other: TSelection): Boolean;
     constructor Create(const Start, Stop: TDisplayCoord);
     class function Empty: TSelection; static;
-    class function Join(const S1, S2: TSelection): TSelection; static;
     class operator Equal(a, b: TSelection): Boolean;
     class operator NotEqual(a, b: TSelection): Boolean;
   end;
@@ -290,15 +290,19 @@ begin
   Result := Start = Stop
 end;
 
-class function TSelection.Join(const S1, S2: TSelection): TSelection;
+procedure TSelection.Join(const Sel: TSelection);
 var
-  N1, N2: TSelection;
+  N1, N2, N: TSelection;
 
 begin
-  N1 := S1.Normalize;
-  N2 := S2.Normalize;
-  Result.Start := TDisplayCoord.Min(S1.Start, S2.Start);
-  Result.Stop := TDisplayCoord.Max(S1.Stop, S2.Stop);
+  N1 := Normalize;
+  N2 := Sel.Normalize;
+  N.Start := TDisplayCoord.Min(N1.Start, N2.Start);
+  N.Stop := TDisplayCoord.Max(N1.Stop, N2.Stop);
+  if Start <= Stop then
+    Self := N
+  else
+    Self := TSelection.Create(N.Stop, N.Start);
 end;
 
 function TSelection.Normalize: TSelection;
