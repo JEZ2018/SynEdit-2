@@ -86,6 +86,7 @@ type
   TBufferCoord = SynEditTypes.TBufferCoord;
   TDisplayCoord = SynEditTypes.TDisplayCoord;
 
+
   TSynBorderStyle = TBorderStyle;
 
   TSynReplaceAction = (raCancel, raSkip, raReplace, raReplaceAll);
@@ -1505,8 +1506,11 @@ end;
 
 function TCustomSynEdit.GetSelAvail: Boolean;
 begin
-  Result := (fBlockBegin.Char <> fBlockEnd.Char) or
-    ((fBlockBegin.Line <> fBlockEnd.Line) and (fActiveSelectionMode <> smColumn));
+  if SelectionMode = smMultiCaret then
+    Result := fMultiCaretController.HasSelection
+  else
+    Result := (fBlockBegin.Char <> fBlockEnd.Char) or
+      ((fBlockBegin.Line <> fBlockEnd.Line) and (fActiveSelectionMode <> smColumn));
 end;
 
 function TCustomSynEdit.GetSelTabBlock: Boolean;
@@ -2159,7 +2163,6 @@ begin
   else
     fMultiCaretController.Carets.Clear;
 
-
   SetFocus;
   Windows.SetFocus(Handle);
 end;
@@ -2764,8 +2767,8 @@ var
   nRightEdge: Integer;
     // selection info
   bAnySelection: Boolean; // any selection visible?
-  vSelStart: TDisplayCoord; // start of selected area
-  vSelEnd: TDisplayCoord; // end of selected area
+  vSelections: TMultiSelectionArray; // start of selected area
+  //vSelEnd: TDisplayCoord; // end of selected area
     // info about normal and selected text and background colors
   bSpecialLine, bLineSelected, bCurrentLine: Boolean;
   colFG, colBG: TColor;
@@ -2819,51 +2822,59 @@ var
     // Only if selection is visible anyway.
     if not HideSelection or Self.Focused then
     begin
-      bAnySelection := True;
-      // Get the *real* start of the selected area.
-      if fBlockBegin.Line < fBlockEnd.Line then
-      begin
-        vStart := fBlockBegin;
-        vEnd := fBlockEnd;
+      if ActiveSelectionMode = smMultiCaret then begin
+        bAnySelection := fMultiCaretController.HasSelection;
+        if bAnySelection then
+          fMultiCaretController.CalcMultiSelection(vSelections);
       end
-      else if fBlockBegin.Line > fBlockEnd.Line then
-      begin
-        vEnd := fBlockBegin;
-        vStart := fBlockEnd;
-      end
-      else if fBlockBegin.Char <> fBlockEnd.Char then
-      begin
-        // No selection at all, or it is only on this line.
-        vStart.Line := fBlockBegin.Line;
-        vEnd.Line := vStart.Line;
-        if fBlockBegin.Char < fBlockEnd.Char then
+      else begin
+        bAnySelection := True;
+        // Get the *real* start of the selected area.
+        if fBlockBegin.Line < fBlockEnd.Line then
         begin
-          vStart.Char := fBlockBegin.Char;
-          vEnd.Char := fBlockEnd.Char;
+          vStart := fBlockBegin;
+          vEnd := fBlockEnd;
+        end
+        else if fBlockBegin.Line > fBlockEnd.Line then
+        begin
+          vEnd := fBlockBegin;
+          vStart := fBlockEnd;
+        end
+        else if fBlockBegin.Char <> fBlockEnd.Char then
+        begin
+          // No selection at all, or it is only on this line.
+          vStart.Line := fBlockBegin.Line;
+          vEnd.Line := vStart.Line;
+          if fBlockBegin.Char < fBlockEnd.Char then
+          begin
+            vStart.Char := fBlockBegin.Char;
+            vEnd.Char := fBlockEnd.Char;
+          end
+          else
+          begin
+            vStart.Char := fBlockEnd.Char;
+            vEnd.Char := fBlockBegin.Char;
+          end;
         end
         else
-        begin
-          vStart.Char := fBlockEnd.Char;
-          vEnd.Char := fBlockBegin.Char;
-        end;
-      end
-      else
-        bAnySelection := False;
-      // If there is any visible selection so far, then test if there is an
-      // intersection with the area to be painted.
-      if bAnySelection then
-      begin
-        // Don't care if the selection is not visible.
-        bAnySelection := (vEnd.Line >= vFirstLine) and (vStart.Line <= vLastLine);
+          bAnySelection := False;
+        // If there is any visible selection so far, then test if there is an
+        // intersection with the area to be painted.
         if bAnySelection then
         begin
-          // Transform the selection from text space into screen space
-          vSelStart := BufferToDisplayPos(vStart);
-          vSelEnd := BufferToDisplayPos(vEnd);
-          // In the column selection mode sort the begin and end of the selection,
-          // this makes the painting code simpler.
-          if (fActiveSelectionMode = smColumn) and (vSelStart.Column > vSelEnd.Column) then
-            SwapInt(vSelStart.Column, vSelEnd.Column);
+          // Don't care if the selection is not visible.
+          bAnySelection := (vEnd.Line >= vFirstLine) and (vStart.Line <= vLastLine);
+          if bAnySelection then
+          begin
+            // Transform the selection from text space into screen space
+            SetLength(vSelections, 1);
+            vSelections[0].Start := BufferToDisplayPos(vStart);
+            vSelections[0].Stop := BufferToDisplayPos(vEnd);
+            // In the column selection mode sort the begin and end of the selection,
+            // this makes the painting code simpler.
+            if (fActiveSelectionMode = smColumn) and (vSelections[0].Start.Column > vSelections[0].Stop.Column) then
+              SwapInt(vSelections[0].Start.Column, vSelections[0].Stop.Column);
+          end;
         end;
       end;
     end;
@@ -3379,6 +3390,8 @@ var
     vLastChar: Integer;
     vStartRow: Integer;
     vEndRow: Integer;
+    vSelTopLeft, vSelBottomRight: TDisplayCoord;
+    vSelection: TSelection;
   begin
     // Initialize rcLine for drawing. Note that Top and Bottom are updated
     // inside the loop. Get only the starting point for this.
@@ -3451,38 +3464,45 @@ var
         bComplexLine := False;
         nLineSelStart := 0;
         nLineSelEnd := 0;
+        if bAnySelection then begin
+          vSelTopLeft := vSelections[0].Start;
+          vSelBottomRight := vSelections[High(vSelections)].Stop;
+        end;
         // Does the selection intersect the visible area?
-        if bAnySelection and (cRow >= vSelStart.Row) and (cRow <= vSelEnd.Row) then
+        if bAnySelection and (cRow >= vSelTopLeft.Row) and (cRow <= vSelBottomRight.Row) then
         begin
           // Default to a fully selected line. This is correct for the smLine
           // selection mode and a good start for the smNormal mode.
           nLineSelStart := FirstCol;
           nLineSelEnd := LastCol + 1;
-          if (fActiveSelectionMode = smColumn) or
-            ((fActiveSelectionMode = smNormal) and (cRow = vSelStart.Row)) then
+          if (fActiveSelectionMode = smColumn) or (fActiveSelectionMode = smMultiCaret) or
+            ((fActiveSelectionMode = smNormal) and (cRow = vSelTopLeft.Row)) then
           begin
-            if (vSelStart.Column > LastCol) then
+            if (vSelTopLeft.Column > LastCol) then
             begin
               nLineSelStart := 0;
               nLineSelEnd := 0;
             end
-            else if (vSelStart.Column > FirstCol) then
+            else if (vSelTopLeft.Column > FirstCol) then
             begin
-              nLineSelStart := vSelStart.Column;
+              nLineSelStart := vSelTopLeft.Column;
               bComplexLine := True;
             end;
           end;
+
+          bComplexLine := bComplexLine or (Length(vSelections) > 0);
+
           if (fActiveSelectionMode = smColumn) or
-            ((fActiveSelectionMode = smNormal) and (cRow = vSelEnd.Row)) then
+            ((fActiveSelectionMode = smNormal) and (cRow = vSelBottomRight.Row)) then
           begin
-            if (vSelEnd.Column < FirstCol) then
+            if (vSelBottomRight.Column < FirstCol) then
             begin
               nLineSelStart := 0;
               nLineSelEnd := 0;
             end
-            else if (vSelEnd.Column < LastCol) then
+            else if (vSelBottomRight.Column < LastCol) then
             begin
-              nLineSelEnd := vSelEnd.Column;
+              nLineSelEnd := vSelBottomRight.Column;
               bComplexLine := True;
             end;
           end;
@@ -3509,17 +3529,38 @@ var
           nTokenLen := Length(sToken);
           if bComplexLine then
           begin
-            SetDrawingColors(False);
-            rcToken.Left := Max(rcLine.Left, ColumnToXValue(FirstCol));
-            rcToken.Right := Min(rcLine.Right, ColumnToXValue(nLineSelStart));
-            PaintToken(sToken, nTokenLen, 0, FirstCol, nLineSelStart);
-            rcToken.Left := Max(rcLine.Left, ColumnToXValue(nLineSelEnd));
-            rcToken.Right := Min(rcLine.Right, ColumnToXValue(LastCol));
-            PaintToken(sToken, nTokenLen, 0, nLineSelEnd, LastCol);
-            SetDrawingColors(True);
-            rcToken.Left := Max(rcLine.Left, ColumnToXValue(nLineSelStart));
-            rcToken.Right := Min(rcLine.Right, ColumnToXValue(nLineSelEnd));
-            PaintToken(sToken, nTokenLen, 0, nLineSelStart, nLineSelEnd - 1);
+            if Length(vSelections) > 0 then begin
+              for vSelection in vSelections do begin
+                if vSelection.Start.Row = cRow then begin
+                  nLineSelStart := vSelection.Start.Column;
+                  nLineSelEnd := vSelection.Stop.Column;
+                  SetDrawingColors(False);
+                  rcToken.Left := Max(rcLine.Left, ColumnToXValue(FirstCol));
+                  rcToken.Right := Min(rcLine.Right, ColumnToXValue(nLineSelStart));
+                  PaintToken(sToken, nTokenLen, 0, FirstCol, nLineSelStart);
+                  rcToken.Left := Max(rcLine.Left, ColumnToXValue(nLineSelEnd));
+                  rcToken.Right := Min(rcLine.Right, ColumnToXValue(LastCol));
+                  PaintToken(sToken, nTokenLen, 0, nLineSelEnd, LastCol);
+                  SetDrawingColors(True);
+                  rcToken.Left := Max(rcLine.Left, ColumnToXValue(nLineSelStart));
+                  rcToken.Right := Min(rcLine.Right, ColumnToXValue(nLineSelEnd));
+                  PaintToken(sToken, nTokenLen, 0, nLineSelStart, nLineSelEnd - 1);
+                end;
+              end
+            end
+            else begin
+              SetDrawingColors(False);
+              rcToken.Left := Max(rcLine.Left, ColumnToXValue(FirstCol));
+              rcToken.Right := Min(rcLine.Right, ColumnToXValue(nLineSelStart));
+              PaintToken(sToken, nTokenLen, 0, FirstCol, nLineSelStart);
+              rcToken.Left := Max(rcLine.Left, ColumnToXValue(nLineSelEnd));
+              rcToken.Right := Min(rcLine.Right, ColumnToXValue(LastCol));
+              PaintToken(sToken, nTokenLen, 0, nLineSelEnd, LastCol);
+              SetDrawingColors(True);
+              rcToken.Left := Max(rcLine.Left, ColumnToXValue(nLineSelStart));
+              rcToken.Right := Min(rcLine.Right, ColumnToXValue(nLineSelEnd));
+              PaintToken(sToken, nTokenLen, 0, nLineSelStart, nLineSelEnd - 1);
+            end;
           end
           else
           begin

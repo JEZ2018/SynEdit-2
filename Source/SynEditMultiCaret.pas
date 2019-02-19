@@ -159,6 +159,7 @@ type
     procedure InvalidateRect(const aRect: TRect; aErase: Boolean);
     function BufferToDisplayPos(const p: TBufferCoord): TDisplayCoord;
     function DisplayToBufferPos(const p: TDisplayCoord): TBufferCoord;
+    procedure SetSelectionMode(const Value: TSynSelectionMode);
     procedure BeginUpdate;
     procedure EndUpdate;
   end;
@@ -186,12 +187,14 @@ type
     FSandBoxContext: Boolean;
     function CaretPointToRect(const CaretPoint: TPoint): TRect;
     function CaretSelectionRect(Caret: TCaretItem): TRect;
+    procedure ClearSelection;
     procedure SetActive(const Value: Boolean);
     procedure SetShape(const Value: TCaretShape);
     procedure InvertCaretsRects;
     procedure Blink(Sender: TObject);
     procedure DoCaretsChanged(Sender: TObject);
-    procedure DoBeforeAfterCaretsClear(Sender: TObject);
+    procedure DoBeforeCaretsClear(Sender: TObject);
+    procedure DoAfterCaretsClear(Sender: TObject);
     procedure DoBeforeCaretsDelete(Sender: TObject);
     procedure DoCaretMoved(Sender: TCaretItem; const PointFrom: TPoint;
       const PointTo: TPoint);
@@ -219,6 +222,8 @@ type
     property Carets: TCarets read FCarets;
     property Shape: TCaretShape read FShape write SetShape;
     function Exists(const PosX: Integer; const PosY: Integer): Boolean;
+    function HasSelection: Boolean;
+    procedure CalcMultiSelection(out Values: TMultiSelectionArray);
     {$IFDEF DEBUG}
     procedure ShowDebugState;
     procedure InvertShown;
@@ -579,7 +584,7 @@ procedure TCaretItem.SetSelLen(const Value: Integer);
 var
   ValueFrom: Integer;
 begin
-  if (Value <> FSelLen) and (Value >= 0) then begin
+  if Value <> FSelLen then begin
     ValueFrom := FSelLen;
     FSelLen := Value;
     if Assigned(FOnSelLenChanged) then
@@ -609,6 +614,32 @@ begin
   InvertCaretsRects;
 end;
 
+procedure TMultiCaretController.CalcMultiSelection(
+  out Values: TMultiSelectionArray);
+var
+  ActualSelCount: Integer;
+  CaretItem: TCaretItem;
+  SelRect: TRect;
+  Y: Integer;
+
+begin
+  SetLength(Values, 0);
+  if HasSelection then begin
+    ActualSelCount := 0;
+    SetLength(Values, FCarets.Count);
+    for CaretItem in FCarets.Sorted do begin
+      if CaretItem.SelLen <> 0 then begin
+        SelRect := CaretSelectionRect(CaretItem);
+        Y := (SelRect.BottomRight.Y + SelRect.TopLeft.Y) div 2;
+        Values[ActualSelCount].Start := FEditor.PixelsToNearestRowColumn(SelRect.TopLeft.X, Y);
+        Values[ActualSelCount].Stop := FEditor.PixelsToNearestRowColumn(SelRect.BottomRight.X, Y);
+        Inc(ActualSelCount);
+      end;
+    end;
+    SetLength(Values, ActualSelCount);
+  end;
+end;
+
 function TMultiCaretController.CaretPointToRect(const CaretPoint: TPoint): TRect;
 var
   P: TPoint;
@@ -629,6 +660,14 @@ begin
   Result.NormalizeRect;
 end;
 
+procedure TMultiCaretController.ClearSelection;
+var
+  Caret: TCaretItem;
+begin
+  for Caret in FCarets do
+    Caret.SelLen := 0;
+end;
+
 constructor TMultiCaretController.Create(Editor: IAbstractEditor);
 var
   I: Integer;
@@ -641,8 +680,8 @@ begin
 
   FCarets := TCarets.Create;
   FCarets.OnChanged := DoCaretsChanged;
-  FCarets.OnBeforeClear := DoBeforeAfterCaretsClear;
-  FCarets.OnAfterClear := DoBeforeAfterCaretsClear;
+  FCarets.OnBeforeClear := DoBeforeCaretsClear;
+  FCarets.OnAfterClear := DoAfterCaretsClear;
 
   FCommandsList := TList<Integer>.Create;
   for I := 0 to High(SANDBOX_COMMANDS) do
@@ -732,7 +771,15 @@ begin
   end;
 end;
 
-procedure TMultiCaretController.DoBeforeAfterCaretsClear(Sender: TObject);
+procedure TMultiCaretController.DoAfterCaretsClear(Sender: TObject);
+begin
+  if FShown then
+    InvertCaretsRects;
+  ClearSelection;
+  FEditor.SetSelectionMode(smNormal);
+end;
+
+procedure TMultiCaretController.DoBeforeCaretsClear(Sender: TObject);
 begin
   if FShown then
     InvertCaretsRects;
@@ -783,10 +830,9 @@ begin
       Rect := CaretSelectionRect(Caret);
       FEditor.Canvas.Brush.Color := clBlue;
       FEditor.Canvas.Brush.Style := bsSolid;
-      InvertRect(FEditor.GetCanvas.Handle, Rect);
-     // FEditor.Canvas.FillRect(Rect);
-//
-//      FEditor.InvalidateRect(R, False);
+      //InvertRect(FEditor.GetCanvas.Handle, Rect);
+      //FEditor.Canvas.FillRect(Rect);
+      //FEditor.InvalidateRect(R, False);
     end;
   end;
 end;
@@ -926,7 +972,10 @@ end;
 procedure TMultiCaretController.DoCaretSelLenChanged(Sender: TCaretItem;
   const ValueFrom, ValueTo: Integer);
 begin
-  // nothing
+  if HasSelection then
+    FEditor.SetSelectionMode(smMultiCaret)
+  else
+    FEditor.SetSelectionMode(smNormal)
 end;
 
 procedure TMultiCaretController.DoCaretVisibleChanged(Sender: TCaretItem);
@@ -990,6 +1039,16 @@ begin
     FBlinkTimer.Enabled := False;
     FBlinkTimer.Enabled := True;
   end;
+end;
+
+function TMultiCaretController.HasSelection: Boolean;
+var
+  Caret: TCaretItem;
+begin
+  Result := False;
+  for Caret in FCarets do
+    if Caret.SelLen <> 0 then
+      Exit(True)
 end;
 
 { TCaretShape }

@@ -69,7 +69,7 @@ type
   TKeyPressWEvent = procedure(Sender: TObject; var Key: WideChar) of object;
 
   PSynSelectionMode = ^TSynSelectionMode;
-  TSynSelectionMode = (smNormal, smLine, smColumn);
+  TSynSelectionMode = (smNormal, smLine, smColumn, smMultiCaret);
 
   PBorlandSelectionMode = ^TBorlandSelectionMode;
   TBorlandSelectionMode = (
@@ -105,6 +105,12 @@ type
     class function Min(a, b: TDisplayCoord): TDisplayCoord; static;
     class function Max(a, b: TDisplayCoord): TDisplayCoord; static;
   end;
+
+  TSelection = record
+    Start: TDisplayCoord;
+    Stop: TDisplayCoord;
+  end;
+  TMultiSelectionArray = array of TSelection;
 
 function DisplayCoord(AColumn, ARow: Integer): TDisplayCoord;
 function BufferCoord(AChar, ALine: Integer): TBufferCoord;
