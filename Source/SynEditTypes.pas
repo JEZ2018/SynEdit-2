@@ -41,6 +41,7 @@ unit SynEditTypes;
 interface
 
 uses
+  Types,
   SysUtils;
 
 const
@@ -109,6 +110,14 @@ type
   TSelection = record
     Start: TDisplayCoord;
     Stop: TDisplayCoord;
+    function Normalize: TSelection;
+    function IsEmpty: Boolean;
+    function HasIntersection(const Other: TSelection): Boolean;
+    constructor Create(const Start, Stop: TDisplayCoord);
+    class function Empty: TSelection; static;
+    class function Join(const S1, S2: TSelection): TSelection; static;
+    class operator Equal(a, b: TSelection): Boolean;
+    class operator NotEqual(a, b: TSelection): Boolean;
   end;
   TMultiSelectionArray = array of TSelection;
 
@@ -239,6 +248,70 @@ end;
 class operator TDisplayCoord.NotEqual(a, b: TDisplayCoord): Boolean;
 begin
   Result := (a.Row <> b.Row) or (a.Column <> b.Column);
+end;
+
+{ TSelection }
+
+constructor TSelection.Create(const Start, Stop: TDisplayCoord);
+begin
+  Self.Start := Start;
+  Self.Stop := Stop;
+end;
+
+class function TSelection.Empty: TSelection;
+begin
+  Result.Start.Column := -1;
+  Result.Start.Row := -1;
+  Result.Stop.Column := -1;
+  Result.Stop.Row := -1;
+end;
+
+class operator TSelection.Equal(a, b: TSelection): Boolean;
+begin
+  Result := (a.Start = b.Start) and (a.Stop = b.Stop);
+end;
+
+function TSelection.HasIntersection(const Other: TSelection): Boolean;
+var
+  R1, R2: TRect;
+  N1, N2: TSelection;
+begin
+  N1 := Normalize;
+  N2 := Other.Normalize;
+  R1.TopLeft := TPoint.Create(N1.Start.Column, N1.Start.Row);
+  R1.BottomRight := TPoint.Create(N1.Stop.Column, N1.Stop.Row);
+  R2.TopLeft := TPoint.Create(N2.Start.Column, N2.Start.Row);
+  R2.BottomRight := TPoint.Create(N2.Stop.Column, N2.Stop.Row);
+  Result := IntersectRect(R1, R2)
+end;
+
+function TSelection.IsEmpty: Boolean;
+begin
+  Result := Start = Stop
+end;
+
+class function TSelection.Join(const S1, S2: TSelection): TSelection;
+var
+  N1, N2: TSelection;
+
+begin
+  N1 := S1.Normalize;
+  N2 := S2.Normalize;
+  Result.Start := TDisplayCoord.Min(S1.Start, S2.Start);
+  Result.Stop := TDisplayCoord.Max(S1.Stop, S2.Stop);
+end;
+
+function TSelection.Normalize: TSelection;
+begin
+  if Start <= Stop then
+    Result := TSelection.Create(Start, Stop)
+  else
+    Result := TSelection.Create(Stop, Start)
+end;
+
+class operator TSelection.NotEqual(a, b: TSelection): Boolean;
+begin
+  Result := (a.Start <> b.Start) or (a.Stop <> b.Stop)
 end;
 
 end.

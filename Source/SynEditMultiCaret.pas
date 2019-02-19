@@ -42,9 +42,9 @@ uses
 
 const
   // Editor commands that will be intercepted and executed in SandBox
-  SANDBOX_COMMANDS: array[0..10] of Integer = (ecChar, ecPaste, ecLineBreak,
+  SANDBOX_COMMANDS: array[0..12] of Integer = (ecChar, ecPaste, ecLineBreak,
     ecMoveLineDown, ecMoveLineUp, ecCopyLineDown, ecCopyLineUp,
-    ecDeleteLastChar, ecDeleteChar, ecSelLeft, ecSelRight);
+    ecDeleteLastChar, ecDeleteChar, ecSelLeft, ecSelRight, ecSelUp, ecSelDown);
 
 type
 
@@ -52,27 +52,27 @@ type
   type
     TOnMoved = procedure(Sender: TCaretItem; const PointFrom: TPoint;
       const PointTo: TPoint) of object;
-    TOnSelLenChanged = procedure(Sender: TCaretItem; const ValueFrom: Integer;
-      const ValueTo: Integer) of object;
+    TOnSelectionChanged = procedure(Sender: TCaretItem; const ValueFrom: TSelection;
+      const ValueTo: TSelection) of object;
     TOnVisibleChanged = procedure(Sender: TCaretItem) of object;
   strict private
     FIndex: Integer;
     FPosX: Integer;
     FPosY: Integer;
-    FSelLen: Integer;
     FVisible: Boolean;
+    FSelection: TSelection;
     FOnMoved: TOnMoved;
     FOnVisibleChanged: TOnVisibleChanged;
-    FOnSelLenChanged: TOnSelLenChanged;
+    FOnSelectionChanged: TOnSelectionChanged;
     procedure SetPosX(const Value: Integer);
     procedure SetPosY(const Value: Integer);
-    procedure SetSelLen(const Value: Integer);
     procedure SetVisible(const Value: Boolean);
+    procedure SetSelection(const Value: TSelection);
   protected
     property Index: Integer read FIndex write FIndex;
     property OnMoved: TOnMoved read FOnMoved write FOnMoved;
-    property OnSelLenChanged: TOnSelLenChanged read FOnSelLenChanged
-      write FOnSelLenChanged;
+    property OnSelectionChanged: TOnSelectionChanged read FOnSelectionChanged
+      write FOnSelectionChanged;
     property OnVisibleChanged: TOnVisibleChanged read FOnVisibleChanged
       write FOnVisibleChanged;
     procedure SaveToStream(S: TStream);
@@ -84,8 +84,8 @@ type
     function ToPoint: TPoint;
     property PosX: Integer read FPosX write SetPosX;
     property PosY: INteger read FPosY write SetPosY;
-    property SelLen: Integer read FSelLen write SetSelLen;
     property Visible: Boolean read FVisible write SetVisible;
+    property Selection: TSelection read FSelection write SetSelection;
   end;
 
   TCarets = class
@@ -140,7 +140,6 @@ type
     function GetBlockEnd: TBufferCoord;
     function GetCaretXY: TBufferCoord;
     function GetDisplayXY: TDisplayCoord;
-    function GetTextHeight: Integer;
     function DisplayCoord2CaretXY(const Coord: TDisplayCoord): TPoint;
     function PixelsToNearestRowColumn(aX, aY: Integer): TDisplayCoord;
     procedure SetBlockBegin(Value: TBufferCoord);
@@ -150,7 +149,6 @@ type
     property UndoList: TSynEditUndoList read GetUndoList;
     property BlockBegin: TBufferCoord read GetBlockBegin write SetBlockBegin;
     property BlockEnd: TBufferCoord read GetBlockEnd write SetBlockEnd;
-    property TextHeight: Integer read GetTextHeight;
     procedure ComputeCaret(X, Y: Integer);
     procedure RegisterCommandHandler(const AHandlerProc: THookedCommandEvent;
       AHandlerData: pointer);
@@ -162,6 +160,7 @@ type
     procedure SetSelectionMode(const Value: TSynSelectionMode);
     procedure BeginUpdate;
     procedure EndUpdate;
+    procedure Refresh;
   end;
 
   TCaretShape = record
@@ -186,7 +185,6 @@ type
     FCommandsList: TList<Integer>;
     FSandBoxContext: Boolean;
     function CaretPointToRect(const CaretPoint: TPoint): TRect;
-    function CaretSelectionRect(Caret: TCaretItem): TRect;
     procedure ClearSelection;
     procedure SetActive(const Value: Boolean);
     procedure SetShape(const Value: TCaretShape);
@@ -195,12 +193,11 @@ type
     procedure DoCaretsChanged(Sender: TObject);
     procedure DoBeforeCaretsClear(Sender: TObject);
     procedure DoAfterCaretsClear(Sender: TObject);
-    procedure DoBeforeCaretsDelete(Sender: TObject);
     procedure DoCaretMoved(Sender: TCaretItem; const PointFrom: TPoint;
       const PointTo: TPoint);
     procedure DefaultCaretMoved(const PointFrom: TPoint; const PointTo: TPoint);
-    procedure DoCaretSelLenChanged(Sender: TCaretItem; const ValueFrom: Integer;
-      const ValueTo: Integer);
+    procedure DoCaretSelectionChanged(Sender: TCaretItem; const ValueFrom: TSelection;
+      const ValueTo: TSelection);
     procedure DoCaretVisibleChanged(Sender: TCaretItem);
     // Entry point of SandBox for executing commands
     procedure EditorCommandSandBoxEntryPoint(Sender: TObject;
@@ -284,9 +281,9 @@ end;
 
 function TCarets.CompareCarets(const Left, Right: TCaretItem): Integer;
 begin
-  Result := Left.PosX - Right.PosX;
+  Result := Left.PosY - Right.PosY;
   if Result = 0 then
-    Result := Left.PosY - Right.PosY
+    Result := Left.PosX - Right.PosX
 end;
 
 function TCarets.Count: Integer;
@@ -476,7 +473,7 @@ end;
 
 procedure TCarets.SaveToStream(S: TStream);
 var
-  DefCaretIndex, Count, I: Integer;
+  DefCaretIndex, Count: Integer;
   Caret: TCaretItem;
 begin
   if Assigned(FDefaultCaret) then
@@ -523,6 +520,7 @@ begin
   FPosX := -1;
   FPosY := -1;
   FVisible := True;
+  FSelection := TSelection.Empty;
 end;
 
 constructor TCaretItem.Create(PosX, PosY, SelLen: Integer);
@@ -530,7 +528,6 @@ begin
   Create;
   FPosX := PosX;
   FPosY := PosY;
-  FSelLen := SelLen;
 end;
 
 destructor TCaretItem.Destroy;
@@ -544,15 +541,15 @@ function TCaretItem.LoadFromStream(S: TStream): Boolean;
 begin
   Result := (S.Read(FPosX, SizeOf(FPosX)) = SizeOf(FPosX))
     and (S.Read(FPosY, SizeOf(FPosY)) = SizeOf(FPosY))
-    and (S.Read(FSelLen, SizeOf(FSelLen)) = SizeOf(FSelLen))
-    and (S.Read(FVisible, SizeOf(FVisible)) = SizeOf(FVisible))
+    and (S.Read(FVisible, SizeOf(FVisible)) = SizeOf(FVisible));
+  if Result then
+    Selection := TSelection.Empty
 end;
 
 procedure TCaretItem.SaveToStream(S: TStream);
 begin
   S.Write(FPosX, SizeOf(FPosX));
   S.Write(FPosY, SizeOf(FPosY));
-  S.Write(FSelLen, SizeOf(FSelLen));
   S.Write(FVisible, SizeOf(FVisible));
 end;
 
@@ -580,15 +577,16 @@ begin
   end;
 end;
 
-procedure TCaretItem.SetSelLen(const Value: Integer);
+procedure TCaretItem.SetSelection(const Value: TSelection);
 var
-  ValueFrom: Integer;
+  ValueFrom: TSelection;
+
 begin
-  if Value <> FSelLen then begin
-    ValueFrom := FSelLen;
-    FSelLen := Value;
-    if Assigned(FOnSelLenChanged) then
-      FOnSelLenChanged(Self, ValueFrom, FSelLen)
+  if FSelection <> Value then begin
+    ValueFrom := FSelection;
+    FSelection := Value;
+    if Assigned(FOnSelectionChanged) then
+      FOnSelectionChanged(Self, ValueFrom, Value)
   end;
 end;
 
@@ -619,8 +617,6 @@ procedure TMultiCaretController.CalcMultiSelection(
 var
   ActualSelCount: Integer;
   CaretItem: TCaretItem;
-  SelRect: TRect;
-  Y: Integer;
 
 begin
   SetLength(Values, 0);
@@ -628,11 +624,8 @@ begin
     ActualSelCount := 0;
     SetLength(Values, FCarets.Count);
     for CaretItem in FCarets.Sorted do begin
-      if CaretItem.SelLen <> 0 then begin
-        SelRect := CaretSelectionRect(CaretItem);
-        Y := (SelRect.BottomRight.Y + SelRect.TopLeft.Y) div 2;
-        Values[ActualSelCount].Start := FEditor.PixelsToNearestRowColumn(SelRect.TopLeft.X, Y);
-        Values[ActualSelCount].Stop := FEditor.PixelsToNearestRowColumn(SelRect.BottomRight.X, Y);
+      if not CaretItem.Selection.IsEmpty then begin
+        Values[ActualSelCount] := CaretItem.Selection.Normalize;
         Inc(ActualSelCount);
       end;
     end;
@@ -654,18 +647,12 @@ begin
   Result := Rect(P.X, P.Y, P.X + CaretWidth, P.Y + CaretHeight);
 end;
 
-function TMultiCaretController.CaretSelectionRect(Caret: TCaretItem): TRect;
-begin
-  Result := TRect.Create(Caret.ToPoint, -Caret.SelLen, FEditor.TextHeight);
-  Result.NormalizeRect;
-end;
-
 procedure TMultiCaretController.ClearSelection;
 var
   Caret: TCaretItem;
 begin
   for Caret in FCarets do
-    Caret.SelLen := 0;
+    Caret.Selection := TSelection.Empty
 end;
 
 constructor TMultiCaretController.Create(Editor: IAbstractEditor);
@@ -725,7 +712,6 @@ end;
 procedure TMultiCaretController.InvertCaretsRects;
 var
   Caret: TCaretItem;
-  P: TPoint;
   R, R2: TRect;
 
   procedure ProcessCaret(Crt: TCaretItem);
@@ -775,28 +761,17 @@ procedure TMultiCaretController.DoAfterCaretsClear(Sender: TObject);
 begin
   if FShown then
     InvertCaretsRects;
-  ClearSelection;
-  FEditor.SetSelectionMode(smNormal);
+  if HasSelection then begin
+    ClearSelection;
+    FEditor.SetSelectionMode(smNormal);
+    FEditor.Refresh;
+  end;
 end;
 
 procedure TMultiCaretController.DoBeforeCaretsClear(Sender: TObject);
 begin
   if FShown then
     InvertCaretsRects;
-end;
-
-procedure TMultiCaretController.DoBeforeCaretsDelete(Sender: TObject);
-var
-  R, R2: TRect;
-  Caret: TCaretItem;
-
-begin
-  if FShown then begin
-    Caret := TCaretItem(Sender);
-    R := CaretPointToRect(Caret.ToPoint);
-    if IntersectRect(R2, R, FEditor.GetClientRect) then
-      InvertRect(FEditor.GetCanvas.Handle, R);
-  end;
 end;
 
 procedure TMultiCaretController.DoCaretMoved(Sender: TCaretItem;
@@ -818,36 +793,27 @@ begin
 end;
 
 procedure TMultiCaretController.Paint;
-var
-  Caret: TCaretItem;
-  Rect: TRect;
 begin
   if FShown then
     InvertCaretsRects;
-  // repaint selection area
-  for Caret in FCarets do begin
-    if Caret.SelLen <> 0 then begin
-      Rect := CaretSelectionRect(Caret);
-      FEditor.Canvas.Brush.Color := clBlue;
-      FEditor.Canvas.Brush.Style := bsSolid;
-      //InvertRect(FEditor.GetCanvas.Handle, Rect);
-      //FEditor.Canvas.FillRect(Rect);
-      //FEditor.InvalidateRect(R, False);
-    end;
-  end;
 end;
 
 procedure TMultiCaretController.SandBox(Command: TSynEditorCommand;
   AChar: WideChar; Data: Pointer);
 var
-  DefCaret, ActiveCaret: TCaretItem;
-  DeltaX, DeltaY, NewSelLen: Integer;
+  DefCaret, ActiveCaret, Cur, Next: TCaretItem;
+  Index: Integer;
   BeforeXY, AfterXY, DeltaXY: TPoint;
+  BeforeDisplay, AfterDisplay: TDisplayCoord;
   BlockBegin, BlockEnd: TBufferCoord;
   RightLineSide, BottomColumnSide: TList<TCaretItem>;
   Neighbour: TCaretItem;
+  SortedCarets: TList<TCaretItem>;
 begin
   // Store context
+  if Command in [ecSelDown, ecSelUp] then begin
+    Exit;
+  end;
   DefCaret := FCarets.FDefaultCaret;
   BlockBegin := FEditor.BlockBegin;
   BlockEnd := FEditor.BlockEnd;
@@ -862,7 +828,8 @@ begin
       // implicitly set default caret
       FCarets.FDefaultCaret := ActiveCaret;
       FEditor.ComputeCaret(ActiveCaret.PosX, ActiveCaret.PosY);
-      BeforeXY := FEditor.DisplayCoord2CaretXY(FEditor.GetDisplayXY);
+      BeforeDisplay := FEditor.GetDisplayXY;
+      BeforeXY := FEditor.DisplayCoord2CaretXY(BeforeDisplay);
       // neighbours
       RightLineSide := FCarets.GetLineNeighboursOnRight(ActiveCaret);
       BottomColumnSide := FCarets.GetColumnNeighboursOnBottom(ActiveCaret);
@@ -870,23 +837,63 @@ begin
       FEditor.BlockBegin := FEditor.DisplayToBufferPos(FEditor.GetDisplayXY);
       FEditor.ExecuteCommand(Command, AChar, Data);
       // deltas
-      AfterXY := FEditor.DisplayCoord2CaretXY(FEditor.BufferToDisplayPos(FEditor.GetCaretXY));
+      AfterDisplay := FEditor.BufferToDisplayPos(FEditor.GetCaretXY);
+      AfterXY := FEditor.DisplayCoord2CaretXY(AfterDisplay);
       DeltaXY := AfterXY.Subtract(BeforeXY);
-      // correct neighbours coords according to deltas
-      if (RightLineSide.Count > 0) and (DeltaXY.X > 0) then begin
-        for Neighbour in RightLineSide do
-          Neighbour.PosX := Neighbour.PosX + DeltaXY.X
-      end;
-      if (BottomColumnSide.Count > 0) and (DeltaXY.Y > 0) then begin
-        for Neighbour in BottomColumnSide do
-          Neighbour.PosY := Neighbour.PosY + DeltaXY.Y
+      // correct selection
+      if IsSelectionCommand(Command) then begin
+        if ActiveCaret.Selection.IsEmpty then
+          ActiveCaret.Selection := TSelection.Create(BeforeDisplay, AfterDisplay)
+        else
+          ActiveCaret.Selection := TSelection.Create(ActiveCaret.Selection.Start, AfterDisplay);
+      end
+      else begin
+        // correct neighbours coords according to deltas
+        if (RightLineSide.Count > 0) and (DeltaXY.X > 0) then begin
+          for Neighbour in RightLineSide do
+            Neighbour.PosX := Neighbour.PosX + DeltaXY.X
+        end;
+        if (BottomColumnSide.Count > 0) and (DeltaXY.Y > 0) then begin
+          for Neighbour in BottomColumnSide do
+            Neighbour.PosY := Neighbour.PosY + DeltaXY.Y
+        end;
       end;
     end;
     if IsSelectionCommand(Command) then begin
-      NewSelLen := ActiveCaret.SelLen + AfterXY.X - BeforeXY.X;
-      for ActiveCaret in FCarets do begin
-        ActiveCaret.SelLen := NewSelLen
+      // Sort By line, column
+      SortedCarets := FCarets.Sorted;
+      Index := 0;
+      while Index < SortedCarets.Count-1 do begin
+        Cur := SortedCarets[Index];
+        Next := SortedCarets[Index+1];
+        if Cur.Selection.HasIntersection(Next.Selection) then begin
+          if Command in [ecSelUp, ecSelLeft] then begin
+            Cur.Selection := TSelection.Join(Cur.Selection, Next.Selection);
+            if Next = FCarets.DefaultCaret then
+              FCarets.FDefaultCaret := Cur;
+            FCarets.Delete(Next.Index);
+            SortedCarets.Delete(Index+1);
+          end
+          else if Command in [ecSelDown, ecSelRight] then begin
+            Next.Selection := TSelection.Join(Cur.Selection, Next.Selection);
+            if Cur = FCarets.DefaultCaret then
+              FCarets.FDefaultCaret := Next;
+            FCarets.Delete(Cur.Index);
+            SortedCarets.Delete(Index);
+          end
+          else
+            Inc(Index)
+        end
+        else
+          Inc(Index)
       end;
+      {if HasSelection and (FCarets.Count = 1) then begin
+        FEditor.BlockBegin := FEditor.DisplayToBufferPos(FCarets.DefaultCaret.Selection.Start);
+        FEditor.BlockEnd := FEditor.DisplayToBufferPos(FCarets.DefaultCaret.Selection.Stop);
+        FEditor.SetSelectionMode(smNormal);
+        ClearSelection;
+        FEditor.Refresh;
+      end;}
     end;
   finally
     if not IsSelectionCommand(Command) then begin
@@ -949,7 +956,7 @@ var
   Caret: TCaretItem;
 begin
   for Caret in FCarets do begin
-    Caret.SelLen := 0;
+    Caret.Selection := TSelection.Empty
   end;
 end;
 
@@ -962,15 +969,15 @@ begin
   for Caret in FCarets do begin
     if not Assigned(Caret.OnMoved) then
       Caret.OnMoved := DoCaretMoved;
-    if not Assigned(Caret.OnSelLenChanged) then
-      Caret.OnSelLenChanged := DoCaretSelLenChanged;
     if not Assigned(Caret.OnVisibleChanged) then
       Caret.OnVisibleChanged := DoCaretVisibleChanged;
+    if not Assigned(Caret.OnSelectionChanged) then
+      Caret.OnSelectionChanged := DoCaretSelectionChanged;
   end;
 end;
 
-procedure TMultiCaretController.DoCaretSelLenChanged(Sender: TCaretItem;
-  const ValueFrom, ValueTo: Integer);
+procedure TMultiCaretController.DoCaretSelectionChanged(Sender: TCaretItem;
+  const ValueFrom, ValueTo: TSelection);
 begin
   if HasSelection then
     FEditor.SetSelectionMode(smMultiCaret)
@@ -1047,7 +1054,7 @@ var
 begin
   Result := False;
   for Caret in FCarets do
-    if Caret.SelLen <> 0 then
+    if not Caret.Selection.IsEmpty then
       Exit(True)
 end;
 

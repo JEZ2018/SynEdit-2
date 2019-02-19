@@ -2813,6 +2813,23 @@ var
     end;
   end;
 
+  function SelectionOnRow(Row: Integer): TMultiSelectionArray;
+  var
+    I, ActualLen: Integer;
+    Norm: TSelection;
+  begin
+    SetLength(Result, Length(vSelections));
+    ActualLen := 0;
+    for I := 0 to High(vSelections) do begin
+      Norm := vSelections[I].Normalize;
+      if InRange(Row, Norm.Start.Row, Norm.Stop.Row) then begin
+        Result[ActualLen] := Norm;
+        Inc(ActualLen);
+      end;
+    end;
+    SetLength(Result, ActualLen);
+  end;
+
   procedure ComputeSelectionInfo;
   var
     vStart: TBufferCoord;
@@ -3391,7 +3408,11 @@ var
     vStartRow: Integer;
     vEndRow: Integer;
     vSelTopLeft, vSelBottomRight: TDisplayCoord;
+    // +++ MultiCaret
     vSelection: TSelection;
+    vRowSelections: TMultiSelectionArray;
+    nFirstCol, nLastCol, SelIndex: Integer;
+    // +++
   begin
     // Initialize rcLine for drawing. Note that Top and Bottom are updated
     // inside the loop. Get only the starting point for this.
@@ -3529,24 +3550,32 @@ var
           nTokenLen := Length(sToken);
           if bComplexLine then
           begin
-            if Length(vSelections) > 0 then begin
-              for vSelection in vSelections do begin
-                if vSelection.Start.Row = cRow then begin
-                  nLineSelStart := vSelection.Start.Column;
-                  nLineSelEnd := vSelection.Stop.Column;
-                  SetDrawingColors(False);
-                  rcToken.Left := Max(rcLine.Left, ColumnToXValue(FirstCol));
-                  rcToken.Right := Min(rcLine.Right, ColumnToXValue(nLineSelStart));
-                  PaintToken(sToken, nTokenLen, 0, FirstCol, nLineSelStart);
-                  rcToken.Left := Max(rcLine.Left, ColumnToXValue(nLineSelEnd));
-                  rcToken.Right := Min(rcLine.Right, ColumnToXValue(LastCol));
-                  PaintToken(sToken, nTokenLen, 0, nLineSelEnd, LastCol);
-                  SetDrawingColors(True);
-                  rcToken.Left := Max(rcLine.Left, ColumnToXValue(nLineSelStart));
-                  rcToken.Right := Min(rcLine.Right, ColumnToXValue(nLineSelEnd));
-                  PaintToken(sToken, nTokenLen, 0, nLineSelStart, nLineSelEnd - 1);
-                end;
-              end
+            if Length(vSelections) > 1 then begin
+              vRowSelections := SelectionOnRow(cRow);
+              for SelIndex := 0 to High(vRowSelections) do begin
+                vSelection := vRowSelections[SelIndex];
+                nLineSelStart := vSelection.Start.Column;
+                nLineSelEnd := vSelection.Stop.Column;
+                if SelIndex > 0 then
+                  nFirstCol := vRowSelections[SelIndex-1].Stop.Column
+                else
+                  nFirstCol := FirstCol;
+                if SelIndex < High(vRowSelections) then
+                  nLastCol := vRowSelections[SelIndex+1].Start.Column
+                else
+                  nLastCol := LastCol;
+                SetDrawingColors(False);
+                rcToken.Left := Max(rcLine.Left, ColumnToXValue(nFirstCol));
+                rcToken.Right := Min(rcLine.Right, ColumnToXValue(nLineSelStart));
+                PaintToken(sToken, nTokenLen, 0, nFirstCol, nLineSelStart);
+                rcToken.Left := Max(rcLine.Left, ColumnToXValue(nLineSelEnd));
+                rcToken.Right := Min(rcLine.Right, ColumnToXValue(nLastCol));
+                PaintToken(sToken, nTokenLen, 0, nLineSelEnd, nLastCol);
+                SetDrawingColors(True);
+                rcToken.Left := Max(rcLine.Left, ColumnToXValue(nLineSelStart));
+                rcToken.Right := Min(rcLine.Right, ColumnToXValue(nLineSelEnd));
+                PaintToken(sToken, nTokenLen, 0, nLineSelStart, nLineSelEnd);
+              end;
             end
             else begin
               SetDrawingColors(False);
