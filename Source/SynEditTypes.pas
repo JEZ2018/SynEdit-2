@@ -103,6 +103,8 @@ type
     class operator LessThanOrEqual(a, b: TDisplayCoord): Boolean;
     class operator GreaterThan(a, b: TDisplayCoord): Boolean;
     class operator GreaterThanOrEqual(a, b: TDisplayCoord): Boolean;
+    class operator Add(const a, b : TDisplayCoord): TDisplayCoord;
+    class operator Subtract(a: TDisplayCoord; b: TDisplayCoord): TDisplayCoord;
     class function Min(a, b: TDisplayCoord): TDisplayCoord; static;
     class function Max(a, b: TDisplayCoord): TDisplayCoord; static;
   end;
@@ -196,6 +198,12 @@ end;
 
 { TDisplayCoord }
 
+class operator TDisplayCoord.Add(const a, b: TDisplayCoord): TDisplayCoord;
+begin
+  Result.Row := a.Row + b.Row;
+  Result.Column := a.Column + b.Column
+end;
+
 class operator TDisplayCoord.Equal(a, b: TDisplayCoord): Boolean;
 begin
   Result := (a.Row = b.Row) and (a.Column = b.Column);
@@ -248,6 +256,12 @@ end;
 class operator TDisplayCoord.NotEqual(a, b: TDisplayCoord): Boolean;
 begin
   Result := (a.Row <> b.Row) or (a.Column <> b.Column);
+end;
+
+class operator TDisplayCoord.Subtract(a, b: TDisplayCoord): TDisplayCoord;
+begin
+  Result.Row := a.Row - b.Row;
+  Result.Column := a.Column - b.Column;
 end;
 
 { TSelection }

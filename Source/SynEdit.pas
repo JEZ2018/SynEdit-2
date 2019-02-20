@@ -677,6 +677,7 @@ type
     function GetSelEnd: integer;
     function GetSelStart: integer;
     function GetSelLength: integer;
+    function GetLines: TStrings;
     procedure SetSelEnd(const Value: integer);
     procedure SetSelStart(const Value: integer);
     procedure SetSelLength(const Value: integer);
@@ -859,7 +860,7 @@ type
     property LineHeight: Integer read GetTextHeight;
     property LinesInWindow: Integer read fLinesInWindow;
     property LineText: string read GetLineText write SetLineText;
-    property Lines: TStrings read fLines write SetLines;
+    property Lines: TStrings read GetLines write SetLines;
     property Marks: TSynEditMarkList read fMarkList;
     property Modified: Boolean read fModified write SetModified;
     property PaintLock: Integer read fPaintLock;
@@ -1496,6 +1497,11 @@ begin
   Result := fTextHeight;
 end;
 
+function TCustomSynEdit.GetLines: TStrings;
+begin
+  Result := fLines;
+end;
+
 function TCustomSynEdit.GetLineText: string;
 begin
   if (CaretY >= 1) and (CaretY <= Lines.Count) then
@@ -1588,6 +1594,7 @@ function TCustomSynEdit.GetSelText: string;
 var
   First, Last, TotalLen: Integer;
   ColFrom, ColTo: Integer;
+  Caret: TCaretItem;
   I: Integer;
   l, r: Integer;
   s: string;
@@ -1596,6 +1603,7 @@ var
   vAuxLineChar: TBufferCoord;
   vAuxRowCol: TDisplayCoord;
   vTrimCount: Integer;
+  vBegin, vEnd: TBufferCoord;
 begin
   if not SelAvail then
     Result := ''
@@ -1690,6 +1698,22 @@ begin
           CopyAndForward(Lines[Last], 1, MaxInt, P);
           if (Last + 1) < Lines.Count then
             CopyAndForward(SLineBreak, 1, MaxInt, P);
+        end;
+      smMultiCaret:
+        begin
+          for Caret in fMultiCaretController.Carets do begin
+            if not Caret.Selection.IsEmpty and Caret.Visible then begin
+              vBegin := DisplayToBufferPos(Caret.Selection.Normalize.Start);
+              vEnd := DisplayToBufferPos(Caret.Selection.Normalize.Stop);
+              //
+              ColFrom := vBegin.Char;
+              First := vBegin.Line - 1;
+              ColTo := vEnd.Char;
+              Last := vEnd.Line - 1;
+              //
+
+            end
+          end
         end;
     end;
   end;
@@ -2071,6 +2095,14 @@ begin
 
   if (Button in [mbLeft, mbRight]) then
   begin
+    if SelAvail then begin
+      {if fMultiCaretController.Carets.Count = 1 then
+        fMultiCaretController.Carets.DefaultCaret.Selection := TSelection.Create(
+          BufferToDisplayPos(BlockBegin),
+          BufferToDisplayPos(BlockEnd)
+        ); }
+      fMultiCaretController.Carets.NewDefaultCaret;
+    end;
     if Button = mbRight then
     begin
       if (eoRightMouseMovesCursor in Options) and
@@ -2124,6 +2156,19 @@ begin
     end;
   end;
 
+  if (Button = mbLeft) then begin
+    if ssAlt in Shift then begin
+      CaretPix := DisplayCoord2CaretXY(CaretDisplay);
+      if not fMultiCaretController.Exists(CaretPix.X, CaretPix.Y) then
+        fMultiCaretController.Carets.Add(CaretPix.X, CaretPix.Y);
+    end
+    else
+      fMultiCaretController.Carets.Clear;
+    fMultiCaretController.Flash;
+  end
+  else
+    fMultiCaretController.Carets.Clear;
+
   if not (ssDouble in Shift) then begin
     if ssShift in Shift then
       //BlockBegin and BlockEnd are restored to their original position in the
@@ -2149,19 +2194,6 @@ begin
   begin
     DoOnGutterClick(Button, X, Y)
   end;
-
-  if (Button = mbLeft) then begin
-    if ssAlt in Shift then begin
-      CaretPix := DisplayCoord2CaretXY(CaretDisplay);
-      if not fMultiCaretController.Exists(CaretPix.X, CaretPix.Y) then
-        fMultiCaretController.Carets.Add(CaretPix.X, CaretPix.Y, 0);
-    end
-    else
-      fMultiCaretController.Carets.Clear;
-    fMultiCaretController.Flash;
-  end
-  else
-    fMultiCaretController.Carets.Clear;
 
   SetFocus;
   Windows.SetFocus(Handle);

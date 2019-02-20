@@ -79,7 +79,7 @@ type
     function LoadFromStream(S: TStream): Boolean;
   public
     constructor Create; overload;
-    constructor Create(PosX, PosY, SelLen: Integer); overload;
+    constructor Create(PosX, PosY: Integer); overload;
     destructor Destroy; override;
     function ToPoint: TPoint;
     property PosX: Integer read FPosX write SetPosX;
@@ -117,7 +117,8 @@ type
   public
     constructor Create; virtual;
     destructor Destroy; override;
-    function Add(APosX, APosY, ASelLen: Integer): TCaretItem;
+    function Add(APosX, APosY: Integer): TCaretItem;
+    function NewDefaultCaret: TCaretItem;
     procedure Clear(ExcludeDefaultCaret: Boolean = True);
     procedure Delete(Index: Integer);
     function Count: Integer;
@@ -140,6 +141,7 @@ type
     function GetBlockEnd: TBufferCoord;
     function GetCaretXY: TBufferCoord;
     function GetDisplayXY: TDisplayCoord;
+    function GetLines: TStrings;
     function DisplayCoord2CaretXY(const Coord: TDisplayCoord): TPoint;
     function PixelsToNearestRowColumn(aX, aY: Integer): TDisplayCoord;
     procedure SetBlockBegin(Value: TBufferCoord);
@@ -150,6 +152,7 @@ type
     property UndoList: TSynEditUndoList read GetUndoList;
     property BlockBegin: TBufferCoord read GetBlockBegin write SetBlockBegin;
     property BlockEnd: TBufferCoord read GetBlockEnd write SetBlockEnd;
+    property Lines: TStrings read GetLines;
     procedure ComputeCaret(X, Y: Integer);
     procedure RegisterCommandHandler(const AHandlerProc: THookedCommandEvent;
       AHandlerData: pointer);
@@ -177,6 +180,9 @@ type
 
   TMultiCaretController = class
   strict private
+    {$IFDEF DEBUG}
+    FLastDebugState: string;
+    {$ENDIF}
     FEditor: IAbstractEditor;
     FCarets: TCarets;
     FBlinkTimer: TTimer;
@@ -207,6 +213,10 @@ type
       Data: pointer; HandlerData: pointer);
     procedure SandBox(Command: TSynEditorCommand; AChar: WideChar;
       Data: Pointer);
+    procedure HandleInputAction(Command: TSynEditorCommand; AChar: WideChar;
+      Data: Pointer);
+    procedure HandleSelectionAction(Command: TSynEditorCommand; AChar: WideChar;
+      Data: Pointer); 
     function IsSelectionCommand(Command: TSynEditorCommand): Boolean;
   public
     constructor Create(Editor: IAbstractEditor);
@@ -234,9 +244,9 @@ uses Windows, System.Generics.Defaults;
 
 { TCarets }
 
-function TCarets.Add(APosX, APosY, ASelLen: Integer): TCaretItem;
+function TCarets.Add(APosX, APosY: Integer): TCaretItem;
 begin
-  Result := TCaretItem.Create(APosX, APosY, ASelLen);
+  Result := TCaretItem.Create(APosX, APosY);
   FList.Add(Result);
   Result.Index := FList.Count-1;
   if Assigned(FOnChanged) then
@@ -350,7 +360,7 @@ var
   Caret: TCaretItem;
 begin
   if FList.Count = 0 then begin
-    Caret := Add(0, 0, 0);
+    Caret := Add(0, 0);
     Caret.Visible := False;
     FDefaultCaret := Caret;
   end;
@@ -472,6 +482,12 @@ begin
   end;
 end;
 
+function TCarets.NewDefaultCaret: TCaretItem;
+begin
+  Result := Add(0, 0);
+  FDefaultCaret := Result;
+end;
+
 procedure TCarets.SaveToStream(S: TStream);
 var
   DefCaretIndex, Count: Integer;
@@ -524,7 +540,7 @@ begin
   FSelection := TSelection.Empty;
 end;
 
-constructor TCaretItem.Create(PosX, PosY, SelLen: Integer);
+constructor TCaretItem.Create(PosX, PosY: Integer);
 begin
   Create;
   FPosX := PosX;
@@ -611,6 +627,7 @@ procedure TMultiCaretController.Blink(Sender: TObject);
 begin
   FShown := not FShown;
   InvertCaretsRects;
+  ShowDebugState;
 end;
 
 procedure TMultiCaretController.CalcMultiSelection(
@@ -805,109 +822,17 @@ var
   DefCaret, ActiveCaret, Cur, Next: TCaretItem;
   Index: Integer;
   BeforeXY, AfterXY, DeltaXY: TPoint;
-  BeforeDisplay, AfterDisplay: TDisplayCoord;
+  BeforeDisplay, AfterDisplay, Caret: TDisplayCoord;
   BlockBegin, BlockEnd: TBufferCoord;
   RightLineSide, BottomColumnSide: TList<TCaretItem>;
   Neighbour: TCaretItem;
   SortedCarets: TList<TCaretItem>;
 begin
   // Store context
-  if Command in [ecSelDown, ecSelUp] then begin
-    Exit;
-  end;
-  DefCaret := FCarets.FDefaultCaret;
-  BlockBegin := FEditor.BlockBegin;
-  BlockEnd := FEditor.BlockEnd;
-  //
-  FEditor.BeginUpdate;
-  if not IsSelectionCommand(Command) then begin
-    FEditor.UndoList.BeginMultiBlock;
-    FEditor.UndoList.AddMultiCaretChange(FCarets.Store);
-  end;
-  try
-    for ActiveCaret in FCarets do begin
-      // implicitly set default caret
-      FCarets.FDefaultCaret := ActiveCaret;
-      FEditor.ComputeCaret(ActiveCaret.PosX, ActiveCaret.PosY);
-      BeforeDisplay := FEditor.GetDisplayXY;
-      BeforeXY := FEditor.DisplayCoord2CaretXY(BeforeDisplay);
-      // neighbours
-      RightLineSide := FCarets.GetLineNeighboursOnRight(ActiveCaret);
-      BottomColumnSide := FCarets.GetColumnNeighboursOnBottom(ActiveCaret);
-      // store Editor context
-      FEditor.BlockBegin := FEditor.DisplayToBufferPos(FEditor.GetDisplayXY);
-      FEditor.ExecuteCommand(Command, AChar, Data);
-      // deltas
-      AfterDisplay := FEditor.BufferToDisplayPos(FEditor.GetCaretXY);
-      AfterXY := FEditor.DisplayCoord2CaretXY(AfterDisplay);
-      DeltaXY := AfterXY.Subtract(BeforeXY);
-      // correct selection
-      if IsSelectionCommand(Command) then begin
-        if ActiveCaret.Selection.IsEmpty then
-          ActiveCaret.Selection := TSelection.Create(BeforeDisplay, AfterDisplay)
-        else
-          ActiveCaret.Selection := TSelection.Create(ActiveCaret.Selection.Start, AfterDisplay);
-      end
-      else begin
-        // correct neighbours coords according to deltas
-        if (RightLineSide.Count > 0) and (DeltaXY.X > 0) then begin
-          for Neighbour in RightLineSide do
-            Neighbour.PosX := Neighbour.PosX + DeltaXY.X
-        end;
-        if (BottomColumnSide.Count > 0) and (DeltaXY.Y > 0) then begin
-          for Neighbour in BottomColumnSide do
-            Neighbour.PosY := Neighbour.PosY + DeltaXY.Y
-        end;
-      end;
-    end;
-  finally
-    if not IsSelectionCommand(Command) then begin
-      FEditor.UndoList.EndMultiBlock;
-    end;
-    FEditor.EndUpdate;
-    // Restore context
-    FCarets.FDefaultCaret := DefCaret;
-    FEditor.BlockBegin := BlockBegin;
-    FEditor.BlockEnd := BlockEnd;
-  end;
-  if IsSelectionCommand(Command) then begin
-    // Sort By line, column
-    SortedCarets := FCarets.Sorted;
-    Index := 0;
-    while Index < SortedCarets.Count-1 do begin
-      Cur := SortedCarets[Index];
-      Next := SortedCarets[Index+1];
-      if Cur.Selection.HasIntersection(Next.Selection) then begin
-        if Command in [ecSelUp, ecSelLeft] then begin
-          Cur.Selection.Join(Next.Selection);
-          if Next = FCarets.DefaultCaret then
-            FCarets.FDefaultCaret := Cur;
-          FCarets.Delete(Next.Index);
-          SortedCarets.Delete(Index+1);
-        end
-        else if Command in [ecSelDown, ecSelRight] then begin
-          Next.Selection.Join(Cur.Selection);
-          if Cur = FCarets.DefaultCaret then
-            FCarets.FDefaultCaret := Next;
-          FCarets.Delete(Cur.Index);
-          SortedCarets.Delete(Index);
-        end
-        else
-          Inc(Index)
-      end
-      else
-        Inc(Index)
-    end;
-  end;
-  if HasSelection and (FCarets.Count = 1) then begin
-    FCarets.FDefaultCaret := FCarets[0];
-    FEditor.SetSelectionMode(smNormal);
-    FEditor.SetCaretAndSelection(
-      FEditor.DisplayToBufferPos(FCarets.DefaultCaret.Selection.Stop),
-      FEditor.DisplayToBufferPos(FCarets.DefaultCaret.Selection.Start),
-      FEditor.DisplayToBufferPos(FCarets.DefaultCaret.Selection.Stop)
-    );
-  end
+  if IsSelectionCommand(Command) then
+    HandleSelectionAction(Command, AChar, Data)
+  else
+    HandleInputAction(Command, AChar, Data);
 end;
 
 procedure TMultiCaretController.SetActive(const Value: Boolean);
@@ -941,15 +866,16 @@ var
 begin
   Comma := TStringList.Create;
   try
-    Comma.Add(Format('FShown: %s, FActive: %s',
-      [BoolToStr(FShown, True), BoolToStr(FActive, True)]));
     Comma.Add('Carets: ');
     for Caret in FCarets do begin
-      S := Format('[X: %d; Y: %d; Visible: %s]', [Caret.PosX, Caret.PosY, BoolToStr(Caret.Visible, True)]);
+      S := Format('[X: %d; Y: %d; Default: %s]', [Caret.PosX, Caret.PosY, BoolToStr(Caret = FCarets.DefaultCaret, True)]);
       Comma.Add(S)
     end;
     S := Comma.CommaText;
-    OutputDebugString(PChar(S));
+    if S <> FLastDebugState then begin
+      FLastDebugState := S;
+      OutputDebugString(PChar(S));
+    end;
   finally
     Comma.Free;
   end;
@@ -977,6 +903,7 @@ begin
     if not Assigned(Caret.OnSelectionChanged) then
       Caret.OnSelectionChanged := DoCaretSelectionChanged;
   end;
+  FEditor.Refresh;
 end;
 
 procedure TMultiCaretController.DoCaretSelectionChanged(Sender: TCaretItem;
@@ -1025,14 +952,14 @@ end;
 function TMultiCaretController.Exists(const PosX, PosY: Integer): Boolean;
 var
   Iter: TCaretItem;
-  IterRect, TmpRect, ShotRect: TRect;
+  IterRect, ShotRect: TRect;
 
 begin
   Result := False;
   for Iter in FCarets do begin
     IterRect := CaretPointToRect(Iter.ToPoint);
     ShotRect := CaretPointToRect(TPoint.Create(PosX, PosY));
-    if IntersectRect(TmpRect, ShotRect, IterRect) then
+    if IterRect.IntersectsWith(ShotRect) then
       Exit(True)
   end;
 end;
@@ -1049,6 +976,141 @@ begin
     FBlinkTimer.Enabled := False;
     FBlinkTimer.Enabled := True;
   end;
+end;
+
+procedure TMultiCaretController.HandleInputAction(Command: TSynEditorCommand;
+  AChar: WideChar; Data: Pointer);
+var
+  DefCaret, ActiveCaret: TCaretItem;
+  BeforeXY, AfterXY, DeltaXY: TPoint;
+  BeforeDisplay, AfterDisplay: TDisplayCoord;
+  BlockBegin, BlockEnd: TBufferCoord;
+  RightLineSide, BottomColumnSide: TList<TCaretItem>;
+  Neighbour: TCaretItem;
+begin
+  DefCaret := FCarets.FDefaultCaret;
+  BlockBegin := FEditor.BlockBegin;
+  BlockEnd := FEditor.BlockEnd;
+  //
+  FEditor.BeginUpdate;
+  FEditor.UndoList.BeginMultiBlock;
+  FEditor.UndoList.AddMultiCaretChange(FCarets.Store);
+  try
+    for ActiveCaret in FCarets do begin
+      // implicitly set default caret
+      FCarets.FDefaultCaret := ActiveCaret;
+      FEditor.ComputeCaret(ActiveCaret.PosX, ActiveCaret.PosY);
+      BeforeDisplay := FEditor.GetDisplayXY;
+      BeforeXY := FEditor.DisplayCoord2CaretXY(BeforeDisplay);
+      // neighbours
+      RightLineSide := FCarets.GetLineNeighboursOnRight(ActiveCaret);
+      BottomColumnSide := FCarets.GetColumnNeighboursOnBottom(ActiveCaret);
+      // store Editor context
+      FEditor.BlockBegin := FEditor.DisplayToBufferPos(FEditor.GetDisplayXY);
+      FEditor.ExecuteCommand(Command, AChar, Data);
+      // deltas
+      AfterDisplay := FEditor.BufferToDisplayPos(FEditor.GetCaretXY);
+      AfterXY := FEditor.DisplayCoord2CaretXY(AfterDisplay);
+      DeltaXY := AfterXY.Subtract(BeforeXY);
+      // correct neighbours coords according to deltas
+      if (RightLineSide.Count > 0) and (DeltaXY.X > 0) then begin
+        for Neighbour in RightLineSide do
+          Neighbour.PosX := Neighbour.PosX + DeltaXY.X
+      end;
+      if (BottomColumnSide.Count > 0) and (DeltaXY.Y > 0) then begin
+        for Neighbour in BottomColumnSide do
+          Neighbour.PosY := Neighbour.PosY + DeltaXY.Y
+      end;
+    end;
+  finally
+    FEditor.UndoList.EndMultiBlock;
+    FEditor.EndUpdate;
+    // Restore context
+    FCarets.FDefaultCaret := DefCaret;
+    FEditor.BlockBegin := BlockBegin;
+    FEditor.BlockEnd := BlockEnd;
+  end;
+end;
+
+procedure TMultiCaretController.HandleSelectionAction(
+  Command: TSynEditorCommand; AChar: WideChar; Data: Pointer);
+var
+  DefCaret, ActiveCaret, Cur, Next: TCaretItem;
+  Index: Integer;
+  BeforeXY, AfterXY, DeltaXY: TPoint;
+  BeforeDisplay, AfterDisplay, Caret: TDisplayCoord;
+  BlockBegin, BlockEnd: TBufferCoord;
+  RightLineSide, BottomColumnSide: TList<TCaretItem>;
+  Neighbour: TCaretItem;
+  SortedCarets: TList<TCaretItem>;
+begin
+  // Store context
+  if Command in [ecSelDown, ecSelUp] then begin
+    Exit;
+  end;
+  try
+    for ActiveCaret in FCarets do begin
+      // implicitly set default caret
+      FCarets.FDefaultCaret := ActiveCaret;
+      FEditor.ComputeCaret(ActiveCaret.PosX, ActiveCaret.PosY);
+      BeforeDisplay := FEditor.GetDisplayXY;
+      BeforeXY := FEditor.DisplayCoord2CaretXY(BeforeDisplay);
+      // store Editor context
+      FEditor.BlockBegin := FEditor.DisplayToBufferPos(FEditor.GetDisplayXY);
+      FEditor.ExecuteCommand(Command, AChar, Data);
+      // deltas
+      AfterDisplay := FEditor.BufferToDisplayPos(FEditor.GetCaretXY);
+      AfterXY := FEditor.DisplayCoord2CaretXY(AfterDisplay);
+      DeltaXY := AfterXY.Subtract(BeforeXY);
+      // correct selection
+      if ActiveCaret.Selection.IsEmpty then
+        ActiveCaret.Selection := TSelection.Create(BeforeDisplay, AfterDisplay)
+      else
+        ActiveCaret.Selection := TSelection.Create(ActiveCaret.Selection.Start, AfterDisplay);
+    end;
+  finally
+    // Restore context
+   // FCarets.FDefaultCaret := DefCaret;
+//    FEditor.BlockBegin := BlockBegin;
+//    FEditor.BlockEnd := BlockEnd;
+  end;
+  // Sort By line, column
+  SortedCarets := FCarets.Sorted;
+  Index := 0;
+  while Index < SortedCarets.Count-1 do begin
+    Cur := SortedCarets[Index];
+    Next := SortedCarets[Index+1];
+    if Cur.Selection.HasIntersection(Next.Selection) then begin
+      if Command in [ecSelUp, ecSelLeft] then begin
+        Cur.Selection.Join(Next.Selection);
+        if Next = FCarets.DefaultCaret then
+          FCarets.FDefaultCaret := Cur;
+        FCarets.Delete(Next.Index);
+        SortedCarets.Delete(Index+1);
+      end
+      else if Command in [ecSelDown, ecSelRight] then begin
+        Next.Selection.Join(Cur.Selection);
+        if Cur = FCarets.DefaultCaret then
+          FCarets.FDefaultCaret := Next;
+        FCarets.Delete(Cur.Index);
+        SortedCarets.Delete(Index);
+      end
+      else
+        Inc(Index)
+    end
+    else
+      Inc(Index)
+  end;
+  if HasSelection and (FCarets.Count = 1) then begin
+    FEditor.SetSelectionMode(smNormal);
+    Caret := FCarets.DefaultCaret.Selection.Stop;
+    FEditor.SetCaretAndSelection(
+      FEditor.DisplayToBufferPos(Caret),
+      FEditor.DisplayToBufferPos(FCarets.DefaultCaret.Selection.Start),
+      FEditor.DisplayToBufferPos(FCarets.DefaultCaret.Selection.Stop)
+    );
+    FCarets.DefaultCaret.Selection := TSelection.Empty
+  end
 end;
 
 function TMultiCaretController.HasSelection: Boolean;
