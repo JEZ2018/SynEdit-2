@@ -158,7 +158,7 @@ type
       AHandlerData: pointer);
     procedure ExecuteCommand(Command: TSynEditorCommand; AChar: WideChar;
       Data: pointer);
-    procedure InvalidateRect(const aRect: TRect; aErase: Boolean);
+    procedure InvalidateLines(FirstLine, LastLine: integer);
     function BufferToDisplayPos(const p: TBufferCoord): TDisplayCoord;
     function DisplayToBufferPos(const p: TDisplayCoord): TBufferCoord;
     procedure SetSelectionMode(const Value: TSynSelectionMode);
@@ -191,6 +191,8 @@ type
     FShape: TCaretShape;
     FCommandsList: TList<Integer>;
     FSandBoxContext: Boolean;
+    FCommand: TSynEditorCommand;
+    procedure RefreshSelection;
     function CaretPointToRect(const CaretPoint: TPoint): TRect;
     procedure ClearSelection;
     procedure SetActive(const Value: Boolean);
@@ -705,17 +707,19 @@ var
   NewPos: TPoint;
 begin
   if FSandBoxContext then begin
-    Delta.X := PointTo.X - PointFrom.X;
-    Delta.Y := PointTo.Y - PointFrom.Y;
-    for Caret in FCarets do begin
-      if Caret = Carets.FDefaultCaret then
-        Continue;
-      // prepare
-      NewPos := TPoint.Create(Caret.PosX + Delta.X, Caret.PosY + Delta.Y);
-      NewPos := FEditor.DisplayCoord2CaretXY(FEditor.PixelsToNearestRowColumn(NewPos.X, NewPos.Y));
-      // apply new values
-      Caret.PosX := NewPos.X;
-      Caret.PosY := NewPos.Y;
+    if not IsSelectionCommand(FCommand) then begin
+      Delta.X := PointTo.X - PointFrom.X;
+      Delta.Y := PointTo.Y - PointFrom.Y;
+      for Caret in FCarets do begin
+        if Caret = Carets.FDefaultCaret then
+          Continue;
+        // prepare
+        NewPos := TPoint.Create(Caret.PosX + Delta.X, Caret.PosY + Delta.Y);
+        NewPos := FEditor.DisplayCoord2CaretXY(FEditor.PixelsToNearestRowColumn(NewPos.X, NewPos.Y));
+        // apply new values
+        Caret.PosX := NewPos.X;
+        Caret.PosY := NewPos.Y;
+      end;
     end;
   end;
 end;
@@ -784,6 +788,7 @@ begin
     FEditor.SetSelectionMode(smNormal);
     FEditor.Refresh;
   end;
+  RefreshSelection;
 end;
 
 procedure TMultiCaretController.DoBeforeCaretsClear(Sender: TObject);
@@ -816,23 +821,27 @@ begin
     InvertCaretsRects;
 end;
 
+procedure TMultiCaretController.RefreshSelection;
+begin
+  if HasSelection and (FCarets.Count > 1) then
+      FEditor.SetSelectionMode(smMultiCaret)
+  else
+    FEditor.SetSelectionMode(smNormal)
+end;
+
 procedure TMultiCaretController.SandBox(Command: TSynEditorCommand;
   AChar: WideChar; Data: Pointer);
-var
-  DefCaret, ActiveCaret, Cur, Next: TCaretItem;
-  Index: Integer;
-  BeforeXY, AfterXY, DeltaXY: TPoint;
-  BeforeDisplay, AfterDisplay, Caret: TDisplayCoord;
-  BlockBegin, BlockEnd: TBufferCoord;
-  RightLineSide, BottomColumnSide: TList<TCaretItem>;
-  Neighbour: TCaretItem;
-  SortedCarets: TList<TCaretItem>;
 begin
   // Store context
-  if IsSelectionCommand(Command) then
-    HandleSelectionAction(Command, AChar, Data)
-  else
-    HandleInputAction(Command, AChar, Data);
+  FCommand := Command;
+  try
+    if IsSelectionCommand(Command) then
+      HandleSelectionAction(Command, AChar, Data)
+    else
+      HandleInputAction(Command, AChar, Data);
+  finally
+    FCommand := ecNone
+  end;
 end;
 
 procedure TMultiCaretController.SetActive(const Value: Boolean);
@@ -909,10 +918,7 @@ end;
 procedure TMultiCaretController.DoCaretSelectionChanged(Sender: TCaretItem;
   const ValueFrom, ValueTo: TSelection);
 begin
-  if HasSelection then
-    FEditor.SetSelectionMode(smMultiCaret)
-  else
-    FEditor.SetSelectionMode(smNormal)
+  RefreshSelection
 end;
 
 procedure TMultiCaretController.DoCaretVisibleChanged(Sender: TCaretItem);
@@ -1035,82 +1041,87 @@ end;
 procedure TMultiCaretController.HandleSelectionAction(
   Command: TSynEditorCommand; AChar: WideChar; Data: Pointer);
 var
-  DefCaret, ActiveCaret, Cur, Next: TCaretItem;
-  Index: Integer;
-  BeforeXY, AfterXY, DeltaXY: TPoint;
-  BeforeDisplay, AfterDisplay, Caret: TDisplayCoord;
-  BlockBegin, BlockEnd: TBufferCoord;
-  RightLineSide, BottomColumnSide: TList<TCaretItem>;
-  Neighbour: TCaretItem;
-  SortedCarets: TList<TCaretItem>;
-begin
-  // Store context
-  if Command in [ecSelDown, ecSelUp] then begin
-    Exit;
-  end;
-  try
-    for ActiveCaret in FCarets do begin
-      // implicitly set default caret
-      FCarets.FDefaultCaret := ActiveCaret;
-      FEditor.ComputeCaret(ActiveCaret.PosX, ActiveCaret.PosY);
-      BeforeDisplay := FEditor.GetDisplayXY;
-      BeforeXY := FEditor.DisplayCoord2CaretXY(BeforeDisplay);
-      // store Editor context
-      FEditor.BlockBegin := FEditor.DisplayToBufferPos(FEditor.GetDisplayXY);
-      FEditor.ExecuteCommand(Command, AChar, Data);
-      // deltas
-      AfterDisplay := FEditor.BufferToDisplayPos(FEditor.GetCaretXY);
-      AfterXY := FEditor.DisplayCoord2CaretXY(AfterDisplay);
-      DeltaXY := AfterXY.Subtract(BeforeXY);
-      // correct selection
-      if ActiveCaret.Selection.IsEmpty then
-        ActiveCaret.Selection := TSelection.Create(BeforeDisplay, AfterDisplay)
-      else
-        ActiveCaret.Selection := TSelection.Create(ActiveCaret.Selection.Start, AfterDisplay);
-    end;
-  finally
-    // Restore context
-   // FCarets.FDefaultCaret := DefCaret;
-//    FEditor.BlockBegin := BlockBegin;
-//    FEditor.BlockEnd := BlockEnd;
-  end;
-  // Sort By line, column
-  SortedCarets := FCarets.Sorted;
-  Index := 0;
-  while Index < SortedCarets.Count-1 do begin
-    Cur := SortedCarets[Index];
-    Next := SortedCarets[Index+1];
-    if Cur.Selection.HasIntersection(Next.Selection) then begin
-      if Command in [ecSelUp, ecSelLeft] then begin
-        Cur.Selection.Join(Next.Selection);
-        if Next = FCarets.DefaultCaret then
-          FCarets.FDefaultCaret := Cur;
-        FCarets.Delete(Next.Index);
-        SortedCarets.Delete(Index+1);
-      end
-      else if Command in [ecSelDown, ecSelRight] then begin
-        Next.Selection.Join(Cur.Selection);
-        if Cur = FCarets.DefaultCaret then
-          FCarets.FDefaultCaret := Next;
-        FCarets.Delete(Cur.Index);
-        SortedCarets.Delete(Index);
+  ActiveCaret, DefCaret: TCaretItem;
+  CaretBefore, CaretAfter, CaretDiff: TDisplayCoord;
+  BlockBeginOrig, BlockEndOrig: TBufferCoord;
+  LoLine, HiLine: Integer;
+
+  procedure JoinIntersectedCarets;
+  var
+    Index: Integer;
+    CaretXY: TDisplayCoord;
+    Cur, Next: TCaretItem;
+    SortedCarets: TList<TCaretItem>;
+  begin
+    SortedCarets := FCarets.Sorted;
+    Index := 0;
+    while Index < SortedCarets.Count-1 do begin
+      Cur := SortedCarets[Index];
+      Next := SortedCarets[Index+1];
+      if Cur.Selection.HasIntersection(Next.Selection) then begin
+        if Command in [ecSelUp, ecSelLeft] then begin
+          Cur.Selection.Join(Next.Selection);
+          if Next = FCarets.DefaultCaret then
+            FCarets.FDefaultCaret := Cur;
+          FCarets.Delete(Next.Index);
+        end
+        else if Command in [ecSelDown, ecSelRight] then begin
+          Next.Selection.Join(Cur.Selection);
+          if Cur = FCarets.DefaultCaret then
+            FCarets.FDefaultCaret := Next;
+          FCarets.Delete(Cur.Index);
+        end
+        else
+          Inc(Index)
       end
       else
         Inc(Index)
+    end;
+    if HasSelection and (FCarets.Count = 1) then begin
+      // Restore single caret mechanism
+      CaretXY := FCarets.DefaultCaret.Selection.Stop;
+      FEditor.SetSelectionMode(smNormal);
+      FEditor.SetCaretAndSelection(
+        FEditor.DisplayToBufferPos(CaretXY),
+        FEditor.DisplayToBufferPos(FCarets.DefaultCaret.Selection.Start),
+        FEditor.DisplayToBufferPos(FCarets.DefaultCaret.Selection.Stop)
+      );
     end
-    else
-      Inc(Index)
   end;
-  if HasSelection and (FCarets.Count = 1) then begin
-    FEditor.SetSelectionMode(smNormal);
-    Caret := FCarets.DefaultCaret.Selection.Stop;
-    FEditor.SetCaretAndSelection(
-      FEditor.DisplayToBufferPos(Caret),
-      FEditor.DisplayToBufferPos(FCarets.DefaultCaret.Selection.Start),
-      FEditor.DisplayToBufferPos(FCarets.DefaultCaret.Selection.Stop)
-    );
-    FCarets.DefaultCaret.Selection := TSelection.Empty
-  end
+
+begin
+  // Store context
+  DefCaret := FCarets.FDefaultCaret;
+  BlockBeginOrig := FEditor.BlockBegin;
+  BlockEndOrig := FEditor.BlockEnd;
+  LoLine := MaxInt;
+  HiLine := 0;
+
+  try
+    for ActiveCaret in FCarets do begin
+      FCarets.FDefaultCaret := ActiveCaret;
+      FEditor.ComputeCaret(ActiveCaret.PosX, ActiveCaret.PosY);
+      CaretBefore := FEditor.BufferToDisplayPos(FEditor.GetCaretXY);
+      // execute command
+      FEditor.ExecuteCommand(Command, AChar, Data);
+      // deltas
+      CaretAfter := FEditor.BufferToDisplayPos(FEditor.GetCaretXY);
+      CaretDiff := CaretAfter - CaretBefore;
+      //
+      if ActiveCaret.Selection.IsEmpty then
+        ActiveCaret.Selection := TSelection.Create(CaretBefore, CaretAfter)
+      else
+        ActiveCaret.Selection := TSelection.Create(ActiveCaret.Selection.Start, CaretAfter);
+      LoLine := Min(LoLine, ActiveCaret.Selection.Normalize.Start.Row);
+      HiLine := Max(HiLine, ActiveCaret.Selection.Normalize.Stop.Row);
+    end;
+  finally
+    FCarets.FDefaultCaret := DefCaret;
+    FEditor.BlockBegin := BlockBeginOrig;
+    FEditor.BlockEnd := BlockEndOrig;
+  end;
+  JoinIntersectedCarets;
+  FEditor.Refresh;
 end;
 
 function TMultiCaretController.HasSelection: Boolean;

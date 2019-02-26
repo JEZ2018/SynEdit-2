@@ -42,6 +42,7 @@ interface
 
 uses
   Types,
+  Math,
   SysUtils;
 
 const
@@ -288,10 +289,31 @@ end;
 function TSelection.HasIntersection(const Other: TSelection): Boolean;
 var
   R1, R2: TRect;
-  N1, N2: TSelection;
+  N1, N2, Top, Bottom: TSelection;
 begin
+  if IsEmpty or Other.IsEmpty then
+    Exit(False);
   N1 := Normalize;
   N2 := Other.Normalize;
+  if N1.Start < N2.Start then begin
+    Top := N1;
+    Bottom := N2
+  end
+  else begin
+    Top := N2;
+    Bottom := N1
+  end;
+  if InRange(Top.Stop.Row, Bottom.Start.Row+1, Bottom.Stop.Row+1) then
+  begin
+    Exit(True)
+  end;
+  if InRange(Bottom.Start.Row, Top.Start.Row, Top.Stop.Row) and
+    (Bottom.Start.Column < Top.Start.Column) then
+  begin
+    Exit(True)
+  end;
+
+
   R1.TopLeft := TPoint.Create(N1.Start.Column, N1.Start.Row);
   R1.BottomRight := TPoint.Create(N1.Stop.Column, N1.Stop.Row);
   R2.TopLeft := TPoint.Create(N2.Start.Column, N2.Start.Row);
@@ -324,7 +346,7 @@ begin
   if Start <= Stop then
     Result := TSelection.Create(Start, Stop)
   else
-    Result := TSelection.Create(Stop, Start)
+    Result := TSelection.Create(Stop, Start);
 end;
 
 class operator TSelection.NotEqual(a, b: TSelection): Boolean;

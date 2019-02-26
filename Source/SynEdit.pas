@@ -1597,7 +1597,7 @@ var
   Caret: TCaretItem;
   I: Integer;
   l, r: Integer;
-  s: string;
+  s, sub: string;
   P: PWideChar;
   cRow: Integer;
   vAuxLineChar: TBufferCoord;
@@ -1701,7 +1701,7 @@ begin
         end;
       smMultiCaret:
         begin
-          for Caret in fMultiCaretController.Carets do begin
+          for Caret in fMultiCaretController.Carets.Sorted do begin
             if not Caret.Selection.IsEmpty and Caret.Visible then begin
               vBegin := DisplayToBufferPos(Caret.Selection.Normalize.Start);
               vEnd := DisplayToBufferPos(Caret.Selection.Normalize.Stop);
@@ -1710,8 +1710,31 @@ begin
               First := vBegin.Line - 1;
               ColTo := vEnd.Char;
               Last := vEnd.Line - 1;
-              //
+              if First = Last then
+                S := Copy(Lines[First], ColFrom, ColTo-ColFrom)
+              else begin
+                // first line
+                S := Copy(Lines[First], ColFrom, MaxInt);
+                // next lines
+                for cRow := First+1 to Last do begin
+                  if cRow = Last then
+                    sub := Copy(Lines[cRow], 1, ColTo-1)
+                  else
+                    sub := Copy(Lines[cRow], 1, MaxInt);
+                  if sub <> '' then
+                    if S <> '' then
+                      S := S + SLineBreak + sub
+                    else
+                      S := sub
+                end;
+              end;
 
+              if S <> '' then begin
+                if Result = '' then
+                  Result := S
+                else
+                  Result := Result + SLineBreak + S
+              end
             end
           end
         end;
@@ -2060,6 +2083,7 @@ var
   // Multicaret
   CaretDisplay: TDisplayCoord;
   CaretPix: TPoint;
+  OldDefCaret: TCaretItem;
 begin
   inherited MouseDown(Button, Shift, X, Y);
 
@@ -2096,12 +2120,16 @@ begin
   if (Button in [mbLeft, mbRight]) then
   begin
     if SelAvail then begin
-      {if fMultiCaretController.Carets.Count = 1 then
-        fMultiCaretController.Carets.DefaultCaret.Selection := TSelection.Create(
+      if fMultiCaretController.Carets.Count = 1 then begin
+        OldDefCaret := fMultiCaretController.Carets.DefaultCaret;
+        fMultiCaretController.Carets.NewDefaultCaret;
+        OldDefCaret.Selection := TSelection.Create(
           BufferToDisplayPos(BlockBegin),
           BufferToDisplayPos(BlockEnd)
-        ); }
-      fMultiCaretController.Carets.NewDefaultCaret;
+        );
+      end
+      else
+        fMultiCaretController.Carets.NewDefaultCaret;
     end;
     if Button = mbRight then
     begin
@@ -2159,8 +2187,9 @@ begin
   if (Button = mbLeft) then begin
     if ssAlt in Shift then begin
       CaretPix := DisplayCoord2CaretXY(CaretDisplay);
-      if not fMultiCaretController.Exists(CaretPix.X, CaretPix.Y) then
+      if not fMultiCaretController.Exists(CaretPix.X, CaretPix.Y) then begin
         fMultiCaretController.Carets.Add(CaretPix.X, CaretPix.Y);
+      end;
     end
     else
       fMultiCaretController.Carets.Clear;
@@ -3586,16 +3615,37 @@ var
               vRowSelections := SelectionOnRow(cRow);
               for SelIndex := 0 to High(vRowSelections) do begin
                 vSelection := vRowSelections[SelIndex];
-                nLineSelStart := vSelection.Start.Column;
-                nLineSelEnd := vSelection.Stop.Column;
-                if SelIndex > 0 then
-                  nFirstCol := vRowSelections[SelIndex-1].Stop.Column
+
+                if vSelection.Start.Row < cRow then
+                  nLineSelStart := 1
                 else
-                  nFirstCol := FirstCol;
-                if SelIndex < High(vRowSelections) then
-                  nLastCol := vRowSelections[SelIndex+1].Start.Column
+                  nLineSelStart := vSelection.Start.Column;
+                if vSelection.Stop.Row > cRow then
+                  nLineSelEnd := Length(Lines[cRow-1])+1
                 else
-                  nLastCol := LastCol;
+                  nLineSelEnd := vSelection.Stop.Column;
+
+                if Length(vRowSelections) > 1 then begin
+                  if SelIndex > 0 then
+                    nFirstCol := vRowSelections[SelIndex-1].Stop.Column
+                  else
+                    nFirstCol := FirstCol;
+                  if SelIndex < High(vRowSelections) then
+                    nLastCol := vRowSelections[SelIndex+1].Start.Column
+                  else
+                    nLastCol := LastCol;
+                end
+                else begin
+                  if vSelection.Start.Row < cRow then
+                    nFirstCol := 1
+                  else
+                    nFirstCol := FirstCol;
+                  if vSelection.Stop.Row > cRow then
+                    nLastCol := LastCol
+                  else
+                    nLastCol := LastCol
+                end;
+
                 SetDrawingColors(False);
                 rcToken.Left := Max(rcLine.Left, ColumnToXValue(nFirstCol));
                 rcToken.Right := Min(rcLine.Right, ColumnToXValue(nLineSelStart));
