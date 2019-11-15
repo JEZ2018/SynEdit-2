@@ -446,7 +446,7 @@ constructor TSynGutter.Create;
 begin
   inherited Create;
   fFont := TFont.Create;
-  fFont.Name := 'Courier New';
+  fFont.Name := DefaultFontName;
   fFont.Size := 8;
   fFont.Style := [];
   fUseFontStyle := True;

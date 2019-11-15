@@ -260,7 +260,7 @@ begin
     fFont.Assign(Value)
   else
   begin
-    fFont.Name := 'Courier New';
+    fFont.Name := DefaultFontName;
     fFont.Size := 10;
     fFont.Color := clWindowText;
     fFont.Style := [];

@@ -1292,7 +1292,7 @@ begin
   Width := 200;
   Cursor := crIBeam;
   Color := clWindow;
-  fFontDummy.Name := 'Courier New';
+  fFontDummy.Name := DefaultFontName;
   fFontDummy.Size := 10;
   fFontDummy.CharSet := DEFAULT_CHARSET;
   fTextDrawer := TheTextDrawer.Create([fsBold], fFontDummy);
