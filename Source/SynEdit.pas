@@ -162,8 +162,6 @@ type
 
   TSynEditorOptions = set of TSynEditorOption;
 
-  TSynFontSmoothMethod = (fsmNone, fsmAntiAlias, fsmClearType);
-
 const
   SYNEDIT_DEFAULT_OPTIONS = [eoAutoIndent, eoDragDropEditing, eoEnhanceEndKey,
     eoScrollPastEol, eoShowScrollHint, eoSmartTabs, eoTabsToSpaces,
@@ -341,7 +339,7 @@ type
     fCharsInWindow: Integer;
     fCharWidth: Integer;
     fFontDummy: TFont;
-    fFontSmoothing: TSynFontSmoothMethod;
+    fFontQuality: TFontQuality;
     fInserting: Boolean;
     fLines: TStrings;
     fOrigLines: TStrings;
@@ -636,7 +634,7 @@ type
     procedure InternalSetCaretXY(const Value: TBufferCoord); virtual;
     procedure SetCaretXY(const Value: TBufferCoord); virtual;
     procedure SetCaretXYEx(CallEnsureCursorPos: Boolean; Value: TBufferCoord); virtual;
-    procedure SetFontSmoothing(AValue: TSynFontSmoothMethod);
+    procedure SetFontQuality(AValue: TFontQuality);
     procedure SetName(const Value: TComponentName); override;
     procedure SetReadOnly(Value: boolean); virtual;
     procedure SetWantReturns(Value: Boolean);
@@ -684,7 +682,7 @@ type
     property InternalCaretX: Integer write InternalSetCaretX;
     property InternalCaretY: Integer write InternalSetCaretY;
     property InternalCaretXY: TBufferCoord write InternalSetCaretXY;
-    property FontSmoothing: TSynFontSmoothMethod read fFontSmoothing write SetFontSmoothing;
+    property FontQuality: TFontQuality read fFontQuality write SetFontQuality;
 //++ DPI-Aware
     procedure ChangeScale(M, D: Integer{$if CompilerVersion >= 31}; isDpiChange: Boolean{$endif}); override;
 //-- DPI-Aware
@@ -1018,7 +1016,7 @@ type
     property BookMarkOptions;
     property BorderStyle;
     property ExtraLineSpacing;
-    property FontSmoothing;
+    property FontQuality default fqClearTypeNatural;
     property Gutter;
     property HideSelection;
     property Highlighter;
@@ -1292,9 +1290,11 @@ begin
   Width := 200;
   Cursor := crIBeam;
   Color := clWindow;
+  fFontQuality := fqClearTypeNatural;
   fFontDummy.Name := DefaultFontName;
   fFontDummy.Size := 10;
   fFontDummy.CharSet := DEFAULT_CHARSET;
+  fFontDummy.Quality := fFontQuality;
   fTextDrawer := TheTextDrawer.Create([fsBold], fFontDummy);
   Font.Assign(fFontDummy);
   Font.OnChange := SynFontChanged;
@@ -4015,6 +4015,7 @@ var
   Metrics: TTextMetric;
   AveCW, MaxCW: Integer;
 begin
+  Value.Quality := FontQuality;
   DC := GetDC(0);
   Save := SelectObject(DC, Value.Handle);
   GetTextMetrics(DC, Metrics);
@@ -4112,29 +4113,9 @@ begin
     Lines[CaretY - 1] := Value;
 end;
 
-procedure TCustomSynEdit.SetFontSmoothing(AValue: TSynFontSmoothMethod);
-const
-  NONANTIALIASED_QUALITY = 3;
-  ANTIALIASED_QUALITY    = 4;
-  CLEARTYPE_QUALITY      = 5;
-var
-  bMethod: Byte;
-  lf: TLogFont;
+procedure TCustomSynEdit.SetFontQuality(AValue: TFontQuality);
 begin
-  if fFontSmoothing <> AValue then begin
-    fFontSmoothing:= AValue;
-    case fFontSmoothing of
-      fsmAntiAlias:
-        bMethod:= ANTIALIASED_QUALITY;
-      fsmClearType:
-        bMethod:= CLEARTYPE_QUALITY;
-      else // fsmNone also
-        bMethod:= NONANTIALIASED_QUALITY;
-    end;
-    GetObject(Font.Handle, SizeOf(TLogFont), @lf);
-    lf.lfQuality:= bMethod;
-    Font.Handle:= CreateFontIndirect(lf);
-  end;
+  Font.Quality := AValue;
 end;
 
 procedure TCustomSynEdit.SetName(const Value: TComponentName);
