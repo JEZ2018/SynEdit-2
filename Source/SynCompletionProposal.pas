@@ -48,6 +48,8 @@ interface
 uses
   Windows,
   Messages,
+  SysUtils,
+  Classes,
   Graphics,
   Forms,
   Controls,
@@ -55,14 +57,13 @@ uses
   ExtCtrls,
   Menus,
   Dialogs,
+  ImgList,
   SynEditTypes,
   SynEditKeyCmds,
   SynEditHighlighter,
   SynEditKbdHandler,
   SynEdit,
-  SynUnicode,
-  SysUtils,
-  Classes;
+  SynUnicode;
 
 type
   SynCompletionType = (ctCode, ctHint, ctParams);
@@ -145,7 +146,7 @@ type
     FItemHeight: Integer;
     FMargin: Integer;
     FEffectiveItemHeight: Integer;
-    FImages: TImageList;
+    FImages: TCustomImageList;
 
 //These are the reflections of the Options property of the CompletionProposal
     FCase: boolean;
@@ -178,7 +179,7 @@ type
     procedure SetPosition(const Value: Integer);
     procedure SetResizeable(const Value: Boolean);
     procedure SetItemHeight(const Value: Integer);
-    procedure SetImages(const Value: TImageList);
+    procedure SetImages(const Value: TCustomImageList);
     procedure StringListChange(Sender: TObject);
     procedure DoDoubleClick(Sender : TObject);
     procedure DoFormShow(Sender: TObject);
@@ -253,7 +254,7 @@ type
     property Font: TFont read fFont write SetFont;
     property Columns: TProposalColumns read FColumns write SetColumns;
     property Resizeable: Boolean read FResizeable write SetResizeable default True;
-    property Images: TImageList read FImages write SetImages;
+    property Images: TCustomImageList read FImages write SetImages;
   end;
 
   TSynBaseCompletionProposal = class(TComponent)
@@ -291,7 +292,7 @@ type
     procedure SetPosition(const Value: Integer);
     procedure SetOnValidate(const Value: TValidateEvent);
     procedure SetWidth(Value: Integer);
-    procedure SetImages(const Value: TImageList);
+    procedure SetImages(const Value: TCustomImageList);
     function GetDisplayKind: SynCompletionType;
     procedure SetDisplayKind(const Value: SynCompletionType);
     function GetParameterToken: TCompletionParameter;
@@ -325,7 +326,7 @@ type
     procedure SetItemHeight(const Value: Integer);
     function GetMargin: Integer;
     procedure SetMargin(const Value: Integer);
-    function GetImages: TImageList;
+    function GetImages: TCustomImageList;
     function IsWordBreakChar(AChar: WideChar): Boolean;
   protected
     procedure DefineProperties(Filer: TFiler); override;
@@ -377,7 +378,7 @@ type
     property Columns: TProposalColumns read GetColumns write SetColumns;
     property Resizeable: Boolean read GetResizeable write SetResizeable default True;
     property ItemHeight: Integer read GetItemHeight write SetItemHeight default 0;
-    property Images: TImageList read GetImages write SetImages default nil;
+    property Images: TCustomImageList read GetImages write SetImages default nil;
     property Margin: Integer read GetMargin write SetMargin default 2;
 
     property OnChange: TCompletionChange read GetOnChange write SetOnChange;
@@ -532,9 +533,9 @@ type
 
 
 procedure FormattedTextOut(TargetCanvas: TCanvas; const Rect: TRect;
-  const Text: string; Selected: Boolean; Columns: TProposalColumns; Images: TImageList);
+  const Text: string; Selected: Boolean; Columns: TProposalColumns; Images: TCustomImageList);
 function FormattedTextWidth(TargetCanvas: TCanvas; const Text: string;
-  Columns: TProposalColumns; Images: TImageList): Integer;
+  Columns: TProposalColumns; Images: TCustomImageList): Integer;
 function PrettyTextToFormattedString(const APrettyText: string;
   AlternateBoldStyle: Boolean = False): string;
 
@@ -858,7 +859,7 @@ end;
 
 
 function PaintChunks(TargetCanvas: TCanvas; const Rect: TRect;
-  ChunkList: TFormatChunkList; Columns: TProposalColumns; Images: TImageList;
+  ChunkList: TFormatChunkList; Columns: TProposalColumns; Images: TCustomImageList;
   Invisible: Boolean): Integer;
 var
   i: Integer;
@@ -973,7 +974,7 @@ begin
 end;
 
 procedure FormattedTextOut(TargetCanvas: TCanvas; const Rect: TRect;
-  const Text: string; Selected: Boolean; Columns: TProposalColumns; Images: TImageList);
+  const Text: string; Selected: Boolean; Columns: TProposalColumns; Images: TCustomImageList);
 var
   Chunks: TFormatChunkList;
   StripCommands: TFormatCommands;
@@ -993,7 +994,7 @@ begin
 end;
 
 function FormattedTextWidth(TargetCanvas: TCanvas; const Text: string;
-  Columns: TProposalColumns; Images: TImageList): Integer;
+  Columns: TProposalColumns; Images: TCustomImageList): Integer;
 var
   Chunks: TFormatChunkList;
   TmpRect: TRect;
@@ -1812,7 +1813,7 @@ begin
   end;
 end;
 
-procedure TSynBaseCompletionProposalForm.SetImages(const Value: TImageList);
+procedure TSynBaseCompletionProposalForm.SetImages(const Value: TCustomImageList);
 begin
   if FImages <> Value then
   begin
@@ -2511,12 +2512,12 @@ begin
     FForm.ItemHeight := Value;
 end;
 
-procedure TSynBaseCompletionProposal.SetImages(const Value: TImageList);
+procedure TSynBaseCompletionProposal.SetImages(const Value: TCustomImageList);
 begin
   FForm.Images := Value;
 end;
 
-function TSynBaseCompletionProposal.GetImages: TImageList;
+function TSynBaseCompletionProposal.GetImages: TCustomImageList;
 begin
   Result := FForm.Images;
 end;
