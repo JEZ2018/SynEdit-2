@@ -196,8 +196,10 @@ type
     function FoldsOfType(aType : integer) : TArray<Integer>;
 
     {Scanning support}
-    procedure StoreCollapsedState;
-    procedure RestoreCollapsedState;
+    procedure StoreCollapsedState; overload;
+    procedure RestoreCollapsedState; overload;
+    procedure StoreCollapsedState(Stream: TStream); overload;
+    procedure RestoreCollapsedState(Stream: TStream); overload;
     procedure StartScanning;
     function  StopScanning(Lines : TStrings) : Boolean; // Returns True of Ranges were updated
     procedure AddLineInfo(ALine: Integer; AFoldType: Integer;
@@ -812,7 +814,19 @@ begin
   fRangesNeedFixing := False;
 end;
 
-procedure TSynFoldRanges.ReStoreCollapsedState;
+procedure TSynFoldRanges.RestoreCollapsedState(Stream: TStream);
+Var
+  Size, Line, Index : integer;
+begin
+  Size := Stream.Size;
+  while Stream.Position < Size do begin
+    Stream.ReadData(Line);
+    if FoldStartAtLine(Line, Index) then
+      fRanges.List[Index].Collapsed := True;
+  end;
+end;
+
+procedure TSynFoldRanges.RestoreCollapsedState;
 Var
   i, Index : integer;
 begin
@@ -851,6 +865,15 @@ begin
     RestoreCollapsedState;
     fRangesNeedFixing := False;
   end;
+end;
+
+procedure TSynFoldRanges.StoreCollapsedState(Stream: TStream);
+Var
+  FoldRange : TSynFoldRange;
+begin
+  for FoldRange in fRanges do
+    if FoldRange.Collapsed then
+       Stream.WriteData(FoldRange.FromLine);
 end;
 
 procedure TSynFoldRanges.StoreCollapsedState;
