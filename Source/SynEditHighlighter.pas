@@ -792,27 +792,32 @@ var
 begin
   if (Source <> nil) and (Source is TSynCustomHighlighter) then
   begin
-    Src := TSynCustomHighlighter(Source);
-    for i := 0 to AttrCount - 1 do
-    begin
-      // assign first attribute with the same name
-      AttriName := Attribute[i].Name;
-      for j := 0 to Src.AttrCount - 1 do
+    BeginUpdate;
+    try
+      Src := TSynCustomHighlighter(Source);
+      for i := 0 to AttrCount - 1 do
       begin
-        SrcAttri := Src.Attribute[j];
-        if AttriName = SrcAttri.Name then
+        // assign first attribute with the same name
+        AttriName := Attribute[i].Name;
+        for j := 0 to Src.AttrCount - 1 do
         begin
-          Attribute[i].Assign(SrcAttri);
-          break;
+          SrcAttri := Src.Attribute[j];
+          if AttriName = SrcAttri.Name then
+          begin
+            Attribute[i].Assign(SrcAttri);
+            break;
+          end;
         end;
       end;
+      // assign the sample source text only if same or descendant class
+      if Src is ClassType then
+        SampleSource := Src.SampleSource;
+      //fWordBreakChars := Src.WordBreakChars; //TODO: does this make sense anyway?
+      DefaultFilter := Src.DefaultFilter;
+      Enabled := Src.Enabled;
+    finally
+      EndUpdate;
     end;
-    // assign the sample source text only if same or descendant class
-    if Src is ClassType then
-      SampleSource := Src.SampleSource;
-    //fWordBreakChars := Src.WordBreakChars; //TODO: does this make sense anyway?
-    DefaultFilter := Src.DefaultFilter;
-    Enabled := Src.Enabled;
   end
   else
     inherited Assign(Source);
