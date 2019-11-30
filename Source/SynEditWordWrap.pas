@@ -228,7 +228,9 @@ procedure TSynWordWrapPlugin.GrowLines(aMinSize: integer);
 const
   vStepSize = 256;
 begin
-  Assert(aMinSize > 0);
+  if aMinSize <= 0  then
+    aMinSize := 1;
+
   if aMinSize > fLineCapacity then
   begin
     aMinSize := aMinSize + vStepSize - (aMinSize mod vStepSize);
@@ -241,7 +243,8 @@ procedure TSynWordWrapPlugin.GrowRows(aMinSize: integer);
 const
   vStepSize = 512;
 begin
-  Assert(aMinSize > 0);
+  if aMinSize <= 0  then
+    aMinSize := 1;
   if aMinSize > fRowCapacity then
   begin
     aMinSize := aMinSize + vStepSize - (aMinSize mod vStepSize);
