@@ -50,10 +50,6 @@ uses
   SysUtils,
   Classes;
 
-var
-  // Accumulate/hide whitespace at EOL (at end of wrapped rows, actually)
-  OldWhitespaceBehaviour: Boolean = False;
-
 const
   MaxIndex = MaxInt div 16;
 
@@ -413,35 +409,17 @@ begin
     vLineEnd := vRowBegin + Length(vLine);
     while vRowEnd < vLineEnd do
     begin
-      if OldWhitespaceBehaviour and CharInSet(vRowEnd^, [#32, #9]) then
+      vRowMinEnd := vRowBegin + fMinRowLength;
+      vRunner := vRowEnd - 1;
+      while vRunner > vRowMinEnd do
       begin
-        repeat
-          Inc(vRowEnd);
-        until not CharInSet(vRowEnd^, [#32, #9]);
-      end
-      else
-      begin
-        vRowMinEnd := vRowBegin + fMinRowLength;
-        vRunner := vRowEnd;
-        while vRunner > vRowMinEnd do
+        if Editor.IsWordBreakChar(vRunner^) then
         begin
-          if Editor.IsWordBreakChar(vRunner^) then
-          begin
-            vRowEnd := vRunner;
-            break;
-          end;
-          Dec(vRunner);
+          vRowEnd := vRunner + 1;
+          break;
         end;
+        Dec(vRunner);
       end;
-      // Check TRowLength overflow
-      if OldWhitespaceBehaviour and (vRowEnd - vRowBegin > High(TRowLength)) then
-      begin
-        vRowEnd := vRowBegin + High(TRowLength);
-        vRowMinEnd := vRowEnd - (High(TRowLength) mod Editor.TabWidth);
-        while (vRowEnd^ = #9) and (vRowEnd > vRowMinEnd) do
-          Dec(vRowEnd);
-      end;
-
       // do not cut wide glyphs in half
       if vRowEnd > vRowBegin then
       begin
@@ -545,35 +523,17 @@ begin
     vLineEnd := vRowBegin + Length(vLine);
     while vRowEnd < vLineEnd do
     begin
-      if OldWhitespaceBehaviour and CharInSet(vRowEnd^, [#32, #9]) then
+      vRowMinEnd := vRowBegin + fMinRowLength;
+      vRunner := vRowEnd - 1;
+      while vRunner > vRowMinEnd do
       begin
-        repeat
-          Inc(vRowEnd);
-        until not CharInSet(vRowEnd^, [#32, #9]);
-      end
-      else
-      begin
-        vRowMinEnd := vRowBegin + fMinRowLength;
-        vRunner := vRowEnd;
-        while vRunner > vRowMinEnd do
+        if Editor.IsWordBreakChar(vRunner^) then
         begin
-          if Editor.IsWordBreakChar(vRunner^) then
-          begin
-            vRowEnd := vRunner;
-            break;
-          end;
-          Dec(vRunner);
+          vRowEnd := vRunner + 1;
+          break;
         end;
+        Dec(vRunner);
       end;
-
-      if OldWhitespaceBehaviour and (vRowEnd - vRowBegin > High(TRowLength)) then
-      begin
-        vRowEnd := vRowBegin + High(TRowLength);
-        vRowMinEnd := vRowEnd - (High(TRowLength) mod Editor.TabWidth);
-        while (vRowEnd^ = #9) and (vRowEnd > vRowMinEnd) do
-          Dec(vRowEnd);
-      end;
-
       // do not cut wide glyphs in half
       if vRowEnd > vRowBegin then
       begin
