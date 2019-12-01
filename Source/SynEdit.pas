@@ -4037,6 +4037,7 @@ begin
           Size := Value.Size;
           Style := Value.Style;
           Name := Value.Name;
+          Quality := Value.Quality;
         end;
         inherited Font := fFontDummy;
       end;
