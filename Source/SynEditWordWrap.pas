@@ -402,8 +402,8 @@ begin
   // ****** First parse the new string using an auxiliar array *****
   vLine := TSynEditStringList(Editor.Lines).ExpandedStrings[aIndex];
   vLine := Editor.ExpandAtWideGlyphs(vLine);
-  // Pre-allocate a buffer for rowlengths
-  vMaxNewRows := ((Length(vLine) - 1) div fMinRowLength) + 1;
+  // Pre-allocate a buffer for rowlengths - at least one row
+  vMaxNewRows := Max(((Length(vLine) - 1) div fMinRowLength) + 1, 1);
   vTempRowLengths := AllocMem(vMaxNewRows * SizeOf(TRowLength));
   try
     vLineRowCount := 0;
