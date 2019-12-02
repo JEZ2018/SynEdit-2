@@ -8,10 +8,6 @@
   WITHOUT WARRANTY OF ANY KIND, either express or implied. See the License for
   the specific language governing rights and limitations under the License.
 
-  The Original Code is SynEditWordWrap.pas by Flávio Etrusco, released 2003-12-11.
-  Unicode translation by Maël Hörz.
-  All Rights Reserved.
-
   Contributors to the SynEdit and mwEdit projects are listed in the
   Contributors.txt file.
 
