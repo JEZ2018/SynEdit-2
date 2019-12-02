@@ -1359,13 +1359,20 @@ procedure TSynPasSyn.EnumUserSettings(DelphiVersions: TStrings);
     end;
   end;
 
+var
+  LWOWNode : string;
 begin
   { returns the user settings that exist in the registry }
   // See UseUserSettings below where these strings are used
-  LoadKeyVersions('\SOFTWARE\Borland\Delphi', '');
-  LoadKeyVersions('\SOFTWARE\Borland\BDS', BDSVersionPrefix);
-  LoadKeyVersions('\SOFTWARE\CodeGear\BDS', BDSVersionPrefix);
-  LoadKeyVersions('\SOFTWARE\Embarcadero\BDS', BDSVersionPrefix);
+  {$IFDEF WIN64}
+  LWowNode := 'WOW6432Node\';
+  {$ELSE}
+  LWowNode := '';
+  {$ENDIF}
+  LoadKeyVersions('\SOFTWARE\'+ LWOWNode + 'Borland\Delphi', '');
+  LoadKeyVersions('\SOFTWARE\'+ LWOWNode + 'Borland\BDS', BDSVersionPrefix);
+  LoadKeyVersions('\SOFTWARE\'+ LWOWNode + 'CodeGear\BDS', BDSVersionPrefix);
+  LoadKeyVersions('\SOFTWARE\'+ LWOWNode + 'Embarcadero\BDS', BDSVersionPrefix);
 end;
 
 function TSynPasSyn.UseUserSettings(VersionIndex: Integer): Boolean;

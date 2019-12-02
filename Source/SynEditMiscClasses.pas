@@ -43,21 +43,22 @@ unit SynEditMiscClasses;
 interface
 
 uses
-  Consts,
   Windows,
   Messages,
+  Registry,
+  Consts,
+  SysUtils,
+  Classes,
+  Math,
   Graphics,
   Controls,
   Forms,
   StdCtrls,
   Menus,
-  Registry,
+  ImgList,
   SynEditTypes,
   SynEditKeyConst,
-  SynUnicode,
-  Math,
-  Classes,
-  SysUtils;
+  SynUnicode;
 
 type
   TSynSelectedColor = class(TPersistent)
@@ -171,7 +172,7 @@ type
 
   TSynBookMarkOpt = class(TPersistent)
   private
-    fBookmarkImages: TImageList;
+    fBookmarkImages: TCustomImageList;
     fDrawBookmarksFirst: boolean;
     fEnableKeys: Boolean;
     fGlyphsVisible: Boolean;
@@ -179,7 +180,7 @@ type
     fOwner: TComponent;
     fXoffset: integer;
     fOnChange: TNotifyEvent;
-    procedure SetBookmarkImages(const Value: TImageList);
+    procedure SetBookmarkImages(const Value: TCustomImageList);
     procedure SetDrawBookmarksFirst(Value: boolean);
     procedure SetGlyphsVisible(Value: Boolean);
     procedure SetLeftMargin(Value: Integer);
@@ -191,7 +192,7 @@ type
     procedure ChangeScale(M, D: Integer); virtual;
 //-- DPI-Aware
   published
-    property BookmarkImages: TImageList
+    property BookmarkImages: TCustomImageList
       read fBookmarkImages write SetBookmarkImages;
     property DrawBookmarksFirst: boolean read fDrawBookmarksFirst
       write SetDrawBookmarksFirst default True;
@@ -446,7 +447,7 @@ constructor TSynGutter.Create;
 begin
   inherited Create;
   fFont := TFont.Create;
-  fFont.Name := 'Courier New';
+  fFont.Name := DefaultFontName;
   fFont.Size := 8;
   fFont.Style := [];
   fUseFontStyle := True;
@@ -790,7 +791,7 @@ begin
     inherited Assign(Source);
 end;
 
-procedure TSynBookMarkOpt.SetBookmarkImages(const Value: TImageList);
+procedure TSynBookMarkOpt.SetBookmarkImages(const Value: TCustomImageList);
 begin
   if fBookmarkImages <> Value then begin
     fBookmarkImages := Value;

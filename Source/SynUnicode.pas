@@ -720,4 +720,3 @@ initialization
   Assert(Win32Platform = VER_PLATFORM_WIN32_NT, 'Unsupported Windows version');
 
 end.
-

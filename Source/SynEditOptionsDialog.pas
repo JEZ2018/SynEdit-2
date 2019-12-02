@@ -325,7 +325,9 @@ implementation
 {$R *.dfm}
 
 uses
-  Types, SynEditKeyConst;
+  Types,
+  SynEditKeyConst,
+  SynEditMiscProcs;
 
 { TSynEditOptionsDialog }
 
@@ -440,7 +442,7 @@ begin
   FSelectedColor.Foreground:= clHighlightText;
   FSelectedColor.Background:= clHighlight;
   FFont:= TFont.Create;
-  FFont.Name:= 'Courier New';
+  FFont.Name:= DefaultFontName;
   FFont.Size:= 8;
   Color:= clWindow;
   Keystrokes.ResetDefaults;
