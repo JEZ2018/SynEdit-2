@@ -41,6 +41,8 @@ unit SynEditTypes;
 interface
 
 uses
+  Types,
+  Math,
   SysUtils;
 
 const
@@ -60,18 +62,15 @@ type
 
   TCategoryMethod = function(AChar: WideChar): Boolean of object;
 
+  TSynEditorCommand = type word;
+
+  THookedCommandEvent = procedure(Sender: TObject; AfterProcessing: Boolean;
+    var Handled: Boolean; var Command: TSynEditorCommand; var AChar: WideChar;
+    Data: pointer; HandlerData: pointer) of object;
+
   PSynSelectionMode = ^TSynSelectionMode;
   TSynSelectionMode = (smNormal, smLine, smColumn);
 
-  PBorlandSelectionMode = ^TBorlandSelectionMode;
-  TBorlandSelectionMode = (
-    bsmInclusive, // selects inclusive blocks. Borland IDE shortcut: Ctrl+O+I
-    bsmLine,      // selects line blocks. Borland IDE shortcut: Ctrl+O+L
-    bsmColumn,    // selects column blocks. Borland IDE shortcut: Ctrl+O+C
-    bsmNormal     // selects normal Block. Borland IDE shortcut: Ctrl+O+K
-  );
-
-  //todo: better field names. CharIndex and LineIndex?
   TBufferCoord = record
     Char: integer;
     Line: integer;

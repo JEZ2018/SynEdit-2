@@ -50,7 +50,7 @@ interface
 
 uses
   Windows, Messages, Graphics, Controls, Forms, Dialogs, SynEdit, SynEditKeyCmds,
-  SynUnicode, SysUtils, Classes;
+  SynUnicode, SysUtils, Classes, SynEditTypes;
 
 type
   TSynEditPythonBehaviour = class(TComponent)

@@ -46,6 +46,7 @@ uses
   Menus,
   SynUnicode,
   Classes,
+  SynEditTypes,
   SysUtils;
 
 const
@@ -218,8 +219,6 @@ const
 
 type
   ESynKeyError = class(Exception);
-
-  TSynEditorCommand = type word;
 
   TSynEditKeyStroke = class(TCollectionItem)
   private
