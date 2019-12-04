@@ -1,4 +1,4 @@
-{-------------------------------------------------------------------------------
+ï»¿{-------------------------------------------------------------------------------
 The contents of this file are subject to the Mozilla Public License
 Version 1.1 (the "License"); you may not use this file except in compliance
 with the License. You may obtain a copy of the License at
@@ -12,7 +12,7 @@ The Original Code is: SynDBEdit.pas, released 2000-05-05.
 The Original Code is based on DBmwEdit.pas by Vladimir Kuznetsov, part of
 the mwEdit component suite.
 Portions created by Vladimir Kuznetsov are Copyright (C) 1999 Vladimir Kuznetsov.
-Unicode translation by Maël Hörz.
+Unicode translation by MaÃ«l HÃ¶rz.
 All Rights Reserved.
 
 Contributors to the SynEdit and mwEdit projects are listed in the
@@ -48,6 +48,7 @@ uses
   Controls,
   DbCtrls,
   SynEdit,
+  SynEditTypes,
   SynEditKeyCmds,
   SysUtils,
   Classes,
