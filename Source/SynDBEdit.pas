@@ -314,7 +314,13 @@ begin
   try
     BlobStream := FDataLink.DataSet.CreateBlobStream(FDataLink.Field, bmRead);
     Lines.BeginUpdate;
-    Lines.LoadFromStream(BlobStream, TEncoding.Default);
+    if ((FDataLink.Field is  TBlobField) and
+	    (TBlobField(FDataLink.Field).BlobType in [ftWideMemo,ftWideString]))
+    then
+      Lines.LoadFromStream(BlobStream, TEncoding.Unicode)
+    else
+      //For UTF8 use: System.SysUtils.TEncoding.UTF8
+      Lines.LoadFromStream(BlobStream, TEncoding.Default);
     Lines.EndUpdate;
     BlobStream.Free;
     Modified := False;
