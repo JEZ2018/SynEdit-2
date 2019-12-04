@@ -2958,8 +2958,9 @@ var
           fTextDrawer.ExtTextOut(nX, rcTab.Top, ETOOptions, rcTab,
             PWideChar(Text), 1);
 
-          for i := 0 to TabLen - 1 do           //wipe the text out so we don't
-            sTabbedToken[TabStart + i] := #32;  //count it again
+          //wipe the text out so we don't count it again
+          for i := TabStart to min(TabStart + TabLen - 1, Length(sTabbedToken)) do
+            sTabbedToken[i] := #32;
 
           TabStart := pos(#9, sTabbedToken);
         end;
