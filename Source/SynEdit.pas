@@ -1458,6 +1458,8 @@ begin
   fCodeFolding.Free;
   fAllFoldRanges.Free;
 //-- CodeFolding
+//++ MultiCaret
+  fMultiCaretController.Free;
 end;
 
 function TCustomSynEdit.GetBlockBegin: TBufferCoord;
