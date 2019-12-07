@@ -47,6 +47,7 @@ uses
   StdCtrls,
   ComCtrls,
   ExtCtrls,
+  SynEditTypes,
   SynEditKeyCmds,
   SynEditMiscClasses,
   SysUtils,

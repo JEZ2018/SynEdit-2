@@ -48,6 +48,7 @@ uses
   Windows,
   Menus,
   SynEdit,
+  SynEditTypes,
   SynEditKeyCmds,
   SynUnicode,
   Classes;
@@ -114,7 +115,6 @@ type
 implementation
 
 uses
-  SynEditTypes,
   SysUtils;
 
 { TCustomSynAutoComplete }
