@@ -10201,15 +10201,12 @@ function TCustomSynEdit.DisplayCoord2CaretXY(
   const Coord: TDisplayCoord): TPoint;
 var
   vCaretDisplay: TDisplayCoord;
-  vCaretPix: TPoint;
-
 begin
   vCaretDisplay := Coord;
   if WordWrap and (vCaretDisplay.Column > CharsInWindow + 1) then
+    // review: is this condition ever True?  Is DisplayCoord2CaretXY needed?
     vCaretDisplay.Column := CharsInWindow + 1;
-  vCaretPix := RowColumnToPixels(vCaretDisplay);
-  Result.X := vCaretPix.X;
-  Result.Y := vCaretPix.Y;
+  Result := RowColumnToPixels(vCaretDisplay);
 end;
 
 function TCustomSynEdit.DisplayToBufferPos(const p: TDisplayCoord): TBufferCoord;

@@ -947,6 +947,8 @@ begin
     Handled := (not AfterProcessing) and (FCommandsList.IndexOf(Command) <> -1);
     if Handled then begin
       if not FSandBoxContext then begin
+        // review: if FSandBoxContext is True the Command will not be executed but
+        // appear handled.  Is this OK?
         FSandBoxContext := True;
         try
           SandBox(Command, AChar, Data);
@@ -954,6 +956,8 @@ begin
           FSandBoxContext := False;
         end;
       end;
+      // review: If FCarets.Count > 1 and the command is not handled should we
+      // clear multiple carets?
     end
   end
   else
