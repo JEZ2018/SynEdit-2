@@ -292,7 +292,7 @@ var
   N1, N2, Top, Bottom: TSelection;
 begin
   if IsEmpty or Other.IsEmpty then
-    // Review: If same should they be merged?
+    // Review: If same or one inside other should they be merged?
     Exit(False);
   N1 := Normalize;
   N2 := Other.Normalize;
