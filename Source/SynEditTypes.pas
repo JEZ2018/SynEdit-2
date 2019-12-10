@@ -68,20 +68,9 @@ type
     var Handled: Boolean; var Command: TSynEditorCommand; var AChar: WideChar;
     Data: pointer; HandlerData: pointer) of object;
 
-  TKeyPressWEvent = procedure(Sender: TObject; var Key: WideChar) of object;
-
   PSynSelectionMode = ^TSynSelectionMode;
   TSynSelectionMode = (smNormal, smLine, smColumn, smMultiCaret);
 
-  PBorlandSelectionMode = ^TBorlandSelectionMode;
-  TBorlandSelectionMode = (
-    bsmInclusive, // selects inclusive blocks. Borland IDE shortcut: Ctrl+O+I
-    bsmLine,      // selects line blocks. Borland IDE shortcut: Ctrl+O+L
-    bsmColumn,    // selects column blocks. Borland IDE shortcut: Ctrl+O+C
-    bsmNormal     // selects normal Block. Borland IDE shortcut: Ctrl+O+K
-  );
-
-  //todo: better field names. CharIndex and LineIndex?
   TBufferCoord = record
     Char: integer;
     Line: integer;
