@@ -192,7 +192,7 @@ type
     FCommandsList: TList<Integer>;
     FSandBoxContext: Boolean;
     FCommand: TSynEditorCommand;
-    FIsDestroyiing: Boolean;
+    FIsDestroying: Boolean;
     procedure RefreshSelection;
     function CaretPointToRect(const CaretPoint: TPoint): TRect;
     procedure ClearSelection;
@@ -727,7 +727,7 @@ end;
 
 destructor TMultiCaretController.Destroy;
 begin
-  FIsDestroyiing := True;
+  FIsDestroying := True;
   FBlinkTimer.Free;
   FCarets.Free;
   FCommandsList.Free;
@@ -784,7 +784,7 @@ end;
 
 procedure TMultiCaretController.DoAfterCaretsClear(Sender: TObject);
 begin
-  if FIsDestroyiing then Exit;
+  if FIsDestroying then Exit;
 
   if FShown then
     InvertCaretsRects;
@@ -798,7 +798,7 @@ end;
 
 procedure TMultiCaretController.DoBeforeCaretsClear(Sender: TObject);
 begin
-  if not FIsDestroyiing and FShown then
+  if not FIsDestroying and FShown then
     InvertCaretsRects;
 end;
 
@@ -931,7 +931,7 @@ var
   R, R2: TRect;
 
 begin
-  if not FIsDestroyiing and FShown then begin
+  if not FIsDestroying and FShown then begin
     R := CaretPointToRect(Sender.ToPoint);
       if IntersectRect(R2, R, FEditor.GetClientRect) then
         InvertRect(FEditor.GetCanvas.Handle, R);
