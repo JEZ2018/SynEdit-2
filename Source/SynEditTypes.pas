@@ -100,6 +100,8 @@ type
   end;
 
   TSelection = record
+    // review:  I think that Start and Stop should be TBufferCoord
+    // as BeginBlock and EndBlock
     Start: TDisplayCoord;
     Stop: TDisplayCoord;
     function Normalize: TSelection;

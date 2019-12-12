@@ -56,7 +56,13 @@ type
       const ValueTo: TSelection) of object;
     TOnVisibleChanged = procedure(Sender: TCaretItem) of object;
   strict private
+    // review: Do we need to store the index?
     FIndex: Integer;
+    // review:  Instead of Client Coordinates I think it is better just to store
+    // TBufferCoord.  (Pixel coordinates are volatile, resizing window etc.)
+    // You can always conver Buffer coordinatest to DisplayPos and then to Client
+    // coordinates
+    // In this way TCaretItem would map directly to CaretXY which is TBufferCoord
     FPosX: Integer;
     FPosY: Integer;
     FVisible: Boolean;
