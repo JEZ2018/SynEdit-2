@@ -2125,7 +2125,7 @@ var
   BC: TBufferCoord;
 begin
   inherited MouseMove(Shift, x, y);
-  if (ssLeft in Shift) and MouseCapture then
+  if (ssLeft in Shift) and MouseCapture and not IsScrolling then
   begin
     // should we begin scrolling?
     ComputeScroll(X, Y);
