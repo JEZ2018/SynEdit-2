@@ -91,13 +91,6 @@ const
   BOM_MSB_FIRST = WideChar($FFFE);
 
 type
-  TSaveFormat = (sfUTF16LSB, sfUTF16MSB, sfUTF8, sfAnsi);
-
-const
-  sfUnicodeLSB = sfUTF16LSB;
-  sfUnicodeMSB = sfUTF16MSB;
-
-type
   TFontCharSet = 0..255;
 
 function SynCharNext(P: PWideChar): PWideChar; overload;
