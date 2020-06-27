@@ -535,7 +535,7 @@ procedure TSynCustomExporter.SaveToFile(const FileName: string);
 var
   Stream: TStream;
 begin
-  Stream := TWideFileStream.Create(FileName, fmCreate);
+  Stream := TFileStream.Create(FileName, fmCreate);
   try
     SaveToStream(Stream);
   finally

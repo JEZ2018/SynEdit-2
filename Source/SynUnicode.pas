@@ -112,8 +112,6 @@ type
   TSynEncoding = (seUTF8, seUTF16LE, seUTF16BE, seAnsi);
   TSynEncodings = set of TSynEncoding;
 
-  TWideFileStream = TFileStream;
-
 function IsAnsiOnly(const WS: string): Boolean;
 function IsUTF8(Stream: TStream; out WithBOM: Boolean): Boolean; overload;
 function IsUTF8(const FileName: string; out WithBOM: Boolean): Boolean; overload;
@@ -250,7 +248,7 @@ function IsUTF8(const FileName: string; out WithBOM: Boolean): Boolean;
 var
   Stream: TStream;
 begin
-  Stream := TWideFileStream.Create(FileName, fmOpenRead or fmShareDenyWrite);
+  Stream := TFileStream.Create(FileName, fmOpenRead or fmShareDenyWrite);
   try
     Result := IsUTF8(Stream, WithBOM);
   finally
@@ -395,7 +393,7 @@ function GetEncoding(const FileName: string; out WithBOM: Boolean): TSynEncoding
 var
   Stream: TStream;
 begin
-  Stream := TWideFileStream.Create(FileName, fmOpenRead or fmShareDenyWrite);
+  Stream := TFileStream.Create(FileName, fmOpenRead or fmShareDenyWrite);
   try
     Result := GetEncoding(Stream, WithBOM);
   finally
@@ -449,7 +447,7 @@ procedure SaveToFile(const WS: string; const FileName: string;
 var
   Stream: TStream;
 begin
-  Stream := TWideFileStream.Create(FileName, fmCreate);
+  Stream := TFileStream.Create(FileName, fmCreate);
   try
     SaveToStream(WS, Stream, Encoding, WithBom);
   finally
@@ -462,7 +460,7 @@ procedure SaveToFile(UnicodeStrings: TStrings; const FileName: string;
 var
   Stream: TStream;
 begin
-  Stream := TWideFileStream.Create(FileName, fmCreate);
+  Stream := TFileStream.Create(FileName, fmCreate);
   try
     SaveToStream(UnicodeStrings, Stream, Encoding, WithBom);
   finally
@@ -475,7 +473,7 @@ function LoadFromFile(UnicodeStrings: TStrings; const FileName: string;
 var
   Stream: TStream;
 begin
-  Stream := TWideFileStream.Create(FileName, fmOpenRead or fmShareDenyWrite);
+  Stream := TFileStream.Create(FileName, fmOpenRead or fmShareDenyWrite);
   try
     Result := LoadFromStream(UnicodeStrings, Stream, WithBOM);
   finally
@@ -488,7 +486,7 @@ function LoadFromFile(UnicodeStrings: TStrings; const FileName: string;
 var
   Stream: TStream;
 begin
-  Stream := TWideFileStream.Create(FileName, fmOpenRead or fmShareDenyWrite);
+  Stream := TFileStream.Create(FileName, fmOpenRead or fmShareDenyWrite);
   try
     Result := LoadFromStream(UnicodeStrings, Stream, Encoding, WithBOM);
   finally
