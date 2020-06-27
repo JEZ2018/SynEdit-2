@@ -102,7 +102,6 @@ procedure StrSwapByteOrder(Str: PWideChar);
 function CharSetFromLocale(Language: LCID): TFontCharSet;
 function CodePageFromLocale(Language: LCID): Integer;
 function KeyboardCodePage: Word;
-function KeyUnicode(C: AnsiChar): WideChar;
 
 { functions providing same behavior on Win9x and WinNT based systems}
 function GetTextSize(DC: HDC; Str: PWideChar; Count: Integer): TSize;
@@ -220,13 +219,6 @@ end;
 function KeyboardCodePage: Word;
 begin
   Result := CodePageFromLocale(GetKeyboardLayout(0) and $FFFF);
-end;
-
-// converts the given character (as it comes with a WM_CHAR message) into its
-// corresponding Unicode character depending on the active keyboard layout
-function KeyUnicode(C: AnsiChar): WideChar;
-begin
-  MultiByteToWideChar(KeyboardCodePage, MB_USEGLYPHCHARS, @C, 1, @Result, 1);
 end;
 
 function GetTextSize(DC: HDC; Str: PWideChar; Count: Integer): TSize;
