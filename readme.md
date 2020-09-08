@@ -1,16 +1,17 @@
-TurboPack SynEdit
+# TurboPack SynEdit
 
+***Please note that developement of SynEdit has been moved to https://github.com/TurboPack/SynEdit.  This repository will no longer be maintained and may close down soon.  Please submit new issues and pull requests to [Turbopack SynEdit](https://github.com/TurboPack/SynEdit).***
 
-Table of contents
+### Table of contents
 
 1.  Introduction
 2.  Package names
 3.  Installation
 
-==============================================
+---
 
 
-1. Introduction
+### Introduction
 
 
 SynEdit is a syntax highlighting edit control, not based on the Windows 
@@ -19,9 +20,9 @@ common controls. SynEdit is compatible with both Delphi and C++ Builder.
 This is a source-only release of TurboPack SynEdit. It includes
 designtime and runtime packages for Delphi and C++Builder and supports Win32 and Win64.
 
-==============================================
+---
 
-2. Package names
+### Package names
 
 
 TurboPack SynEdit package names have the following form:
@@ -32,9 +33,9 @@ SynEditDD.bpl (Delphi Designtime)
 SynEditCR.bpl (C++Builder Runtime)
 SynEditCD.bpl (C++Builder Designtime)
 
-==============================================
+---
 
-3. Installation
+### Installation
 
 
 To install TurboPack SynEdit into your IDE, take the following
