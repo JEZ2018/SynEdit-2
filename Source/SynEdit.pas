@@ -6999,7 +6999,6 @@ var
   Caret: TBufferCoord;
   CaretNew: TBufferCoord;
   counter: Integer;
-  InsDelta: Integer;
   vCaretRow: Integer;
   s: string;
   i: Integer;
@@ -7362,7 +7361,6 @@ begin
           Temp2 := Temp;
           // This is sloppy, but the Right Thing would be to track the column of markers
           // too, so they could be moved depending on whether they are after the caret...
-          InsDelta := Ord(CaretX = 1);
           Len := Length(Temp);
           if Len > 0 then
           begin
